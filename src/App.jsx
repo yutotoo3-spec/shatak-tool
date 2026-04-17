@@ -315,7 +315,8 @@ const PatternCard = ({ title, subtitle, accent, data, badge, isMobile }) => (
         border: `1px solid ${badge ? "#bbf7d0" : "#e2e8f0"}`,
         borderRadius: 10, padding: "12px 14px", marginBottom: 12, textAlign: "center",
       }}>
-        <div style={{ fontSize: 10, color: "#64748b", fontWeight: 700, marginBottom: 4 }}>月間手取り（実質）概算</div>
+        <div style={{ fontSize: 10, color: "#64748b", fontWeight: 700, marginBottom: 2 }}>月間手取り（実質）概算</div>
+        <div style={{ fontSize: 9, color: "#94a3b8", marginBottom: 4 }}>※家賃支払い完了後</div>
         <div style={{ fontSize: isMobile ? 26 : 24, fontWeight: 900, color: badge ? "#16a34a" : "#1e293b" }}>
           {yen(data.m_tedori)}
         </div>
