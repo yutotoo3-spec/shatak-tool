@@ -225,6 +225,144 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
+// ── 理論年収・年間負担内訳テーブル
+const CostSummaryTable = ({ no, yes, nenshu, isMobile }) => {
+  const totalNenshu = nenshu * 10000;
+
+  const noPersonal  = no.annual_yachin + no.annual_shakai + no.annual_shotoku + no.annual_jumin;
+  const yesPersonal = yes.annual_yachin + yes.annual_shakai + yes.annual_shotoku + yes.annual_jumin;
+  const noCompany   = no.companyTotal * 12;
+  const yesCompany  = yes.companyTotal * 12;
+
+  const TH = ({ children, accent }) => (
+    <th style={{
+      padding: isMobile ? "8px 6px" : "10px 14px",
+      fontSize: isMobile ? 11 : 12, fontWeight: 800,
+      color: accent ? "#fff" : "#475569",
+      background: accent ?? "#f8fafc",
+      textAlign: "center", borderBottom: "2px solid #e2e8f0",
+      whiteSpace: "nowrap",
+    }}>{children}</th>
+  );
+
+  const TD = ({ children, bold, highlight, sub, right }) => (
+    <td style={{
+      padding: isMobile ? "7px 6px" : "9px 14px",
+      fontSize: isMobile ? 11 : 12,
+      fontWeight: bold ? 800 : sub ? 400 : 500,
+      color: highlight === "green" ? "#16a34a" : highlight === "blue" ? "#1d4ed8" : sub ? "#94a3b8" : "#1e293b",
+      textAlign: right ? "right" : "left",
+      borderBottom: "1px solid #f1f5f9",
+      background: bold ? (highlight === "green" ? "#f0fdf4" : highlight === "blue" ? "#eff6ff" : "#f8fafc") : "transparent",
+      whiteSpace: "nowrap",
+    }}>{children}</td>
+  );
+
+  const SepRow = ({ label }) => (
+    <tr>
+      <td colSpan={3} style={{
+        padding: "8px 14px 4px",
+        fontSize: 10, fontWeight: 800, color: "#64748b",
+        letterSpacing: "0.1em", background: "#f8fafc",
+        borderBottom: "1px solid #e2e8f0",
+      }}>{label}</td>
+    </tr>
+  );
+
+  return (
+    <div style={{
+      background: "#fff", borderRadius: 14, overflow: "hidden",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.08)", marginBottom: 16,
+      border: "1px solid #e2e8f0",
+    }}>
+      <div style={{ padding: isMobile ? "14px 12px 10px" : "18px 20px 12px" }}>
+        <SectionLabel>理論年収・年間負担内訳（概算）</SectionLabel>
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+          <colgroup>
+            <col style={{ width: isMobile ? "42%" : "44%" }} />
+            <col style={{ width: isMobile ? "29%" : "28%" }} />
+            <col style={{ width: isMobile ? "29%" : "28%" }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <TH> </TH>
+              <TH accent="#475569">社宅なし</TH>
+              <TH accent="#1d4ed8">社宅あり ✦</TH>
+            </tr>
+          </thead>
+          <tbody>
+            {/* 理論年収 */}
+            <tr>
+              <TD bold>理論年収（総報酬価値）</TD>
+              <TD bold right highlight="blue">{yen2(totalNenshu)}</TD>
+              <TD bold right highlight="blue">{yen2(totalNenshu)}</TD>
+            </tr>
+
+            {/* 企業支払い */}
+            <SepRow label="▼ 企業支払い（年間）" />
+            <tr>
+              <TD sub>　給与</TD>
+              <TD right>{yen2(no.teiji)}</TD>
+              <TD right>{yen2(yes.teiji)}</TD>
+            </tr>
+            <tr>
+              <TD sub>　会社負担社保</TD>
+              <TD right>{yen2(no.co_shakai * 12)}</TD>
+              <TD right>{yen2(yes.co_shakai * 12)}</TD>
+            </tr>
+            <tr>
+              <TD sub>　社宅家賃（会社負担）</TD>
+              <TD right sub>−</TD>
+              <TD right>{yen2(yes.co_yachin * 12)}</TD>
+            </tr>
+            <tr>
+              <TD bold>　＝ 企業合計</TD>
+              <TD bold right>{yen2(noCompany)}</TD>
+              <TD bold right>{yen2(yesCompany)}</TD>
+            </tr>
+
+            {/* 個人負担 */}
+            <SepRow label="▼ 個人負担（年間）" />
+            <tr>
+              <TD sub>　家賃自己負担</TD>
+              <TD right>{yen2(no.annual_yachin)}</TD>
+              <TD right>{yen2(yes.annual_yachin)}</TD>
+            </tr>
+            <tr>
+              <TD sub>　社保（本人）</TD>
+              <TD right>{yen2(no.annual_shakai)}</TD>
+              <TD right>{yen2(yes.annual_shakai)}</TD>
+            </tr>
+            <tr>
+              <TD sub>　税金（所得税＋住民税）</TD>
+              <TD right>{yen2(no.annual_shotoku + no.annual_jumin)}</TD>
+              <TD right>{yen2(yes.annual_shotoku + yes.annual_jumin)}</TD>
+            </tr>
+            <tr>
+              <TD bold>　＝ 個人負担合計</TD>
+              <TD bold right>{yen2(noPersonal)}</TD>
+              <TD bold right>{yen2(yesPersonal)}</TD>
+            </tr>
+
+            {/* 手取り */}
+            <SepRow label="▼ 結果" />
+            <tr>
+              <TD bold>年間手取り（実質）概算</TD>
+              <TD bold right>{yen2(no.annual_tedori)}</TD>
+              <TD bold right highlight="green">{yen2(yes.annual_tedori)}</TD>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style={{ padding: "8px 16px 12px", fontSize: 10, color: "#94a3b8", lineHeight: 1.6 }}>
+        ※ 理論年収＝給与＋会社負担社宅費の合計（社員への総報酬価値）。住民税は概算。
+      </div>
+    </div>
+  );
+};
+
 // ── 比較グラフ
 const CompareChart = ({ no, yes, isMobile }) => {
   const data = [
@@ -714,6 +852,9 @@ export default function App() {
               </div>
             </div>
           </div>
+
+          {/* 理論年収・年間負担内訳 */}
+          <CostSummaryTable no={result.no} yes={result.yes} nenshu={nenshu} isMobile={isMobile} />
 
           {/* グラフ */}
           <CompareChart no={result.no} yes={result.yes} isMobile={isMobile} />
