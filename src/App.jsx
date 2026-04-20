@@ -226,8 +226,10 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 // ── 理論年収・年間負担内訳テーブル
-const CostSummaryTable = ({ no, yes, nenshu, isMobile }) => {
-  const totalNenshu = nenshu * 10000;
+const CostSummaryTable = ({ no, yes, isMobile }) => {
+  // 理論年収 = 給与のみ（借上社宅の会社負担分は含まない）
+  // 社宅なし: teiji = 提示年収そのまま
+  // 社宅あり: teiji = 提示年収 − 社宅会社負担分（80%×12ヶ月）
 
   const noPersonal  = no.annual_yachin + no.annual_shakai + no.annual_shotoku + no.annual_jumin;
   const yesPersonal = yes.annual_yachin + yes.annual_shakai + yes.annual_shotoku + yes.annual_jumin;
@@ -295,9 +297,9 @@ const CostSummaryTable = ({ no, yes, nenshu, isMobile }) => {
           <tbody>
             {/* 理論年収 */}
             <tr>
-              <TD bold>理論年収（総報酬価値）</TD>
-              <TD bold right highlight="blue">{yen2(totalNenshu)}</TD>
-              <TD bold right highlight="blue">{yen2(totalNenshu)}</TD>
+              <TD bold>理論年収（給与ベース）</TD>
+              <TD bold right highlight="blue">{yen2(no.teiji)}</TD>
+              <TD bold right highlight="blue">{yen2(yes.teiji)}</TD>
             </tr>
 
             {/* 企業支払い */}
@@ -357,7 +359,7 @@ const CostSummaryTable = ({ no, yes, nenshu, isMobile }) => {
         </table>
       </div>
       <div style={{ padding: "8px 16px 12px", fontSize: 10, color: "#94a3b8", lineHeight: 1.6 }}>
-        ※ 理論年収＝給与＋会社負担社宅費の合計（社員への総報酬価値）。住民税は概算。
+        ※ 理論年収＝給与のみ（借上社宅の会社負担分は含まない）。社宅ありは提示年収から社宅会社負担分を差し引いた額。住民税は概算。
       </div>
     </div>
   );
@@ -854,7 +856,7 @@ export default function App() {
           </div>
 
           {/* 理論年収・年間負担内訳 */}
-          <CostSummaryTable no={result.no} yes={result.yes} nenshu={nenshu} isMobile={isMobile} />
+          <CostSummaryTable no={result.no} yes={result.yes} isMobile={isMobile} />
 
           {/* グラフ */}
           <CompareChart no={result.no} yes={result.yes} isMobile={isMobile} />
