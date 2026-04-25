@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList,
 } from "recharts";
 
 // ─────────────────────────────────────────────────────────────
@@ -62,53 +62,36 @@ const calcJumin = (nenshu, shakai, dep) => {
 };
 
 const calcPattern = (nenshu, yachin, age, dep, withShatak, kenpoRate, bonusMonths, coRatio) => {
-  const coR = coRatio / 100; // 会社負担割合（例：80 → 0.80）
-  // 社宅あり：給与年収から社宅会社負担分を差し引いた額が提示年収
+  const coR = coRatio / 100;
   const teiji = withShatak ? nenshu - yachin * coR * 12 : nenshu;
-
-  // 月収・賞与の分離（提示年収 ÷ (12 + 賞与月数) = 月収）
   const monthly = teiji / (12 + bonusMonths);
   const annualBonus = monthly * bonusMonths;
-
-  // 月次社会保険（標準報酬月額ベース）
   const h = getHyojun(monthly);
   const kenpo = Math.round(h * kenpoRate);
   const kaigo = age >= 40 ? Math.round(h * 0.0080) : 0;
   const kosei = Math.round(h * 0.0915);
   const koyo  = Math.round(monthly * 0.0060);
   const monthly_shakai = kenpo + kaigo + kosei + koyo;
-
-  // 賞与時の社会保険（千円以下切捨て、厚生年金は上限150万/回）
   const bh = Math.floor(annualBonus / 1000) * 1000;
   const bonus_shakai =
     Math.round(bh * kenpoRate) +
     (age >= 40 ? Math.round(bh * 0.0080) : 0) +
     Math.round(Math.min(bh, 1500000) * 0.0915) +
     Math.round(annualBonus * 0.0060);
-
   const annual_shakai = monthly_shakai * 12 + bonus_shakai;
-
-  // 税（年間）
   const kazei = Math.max(0, teiji - kyuyoKojo(teiji) - annual_shakai - 480000 - 380000 * dep);
   const annual_shotoku = calcShotoku(kazei);
   const annual_jumin   = calcJumin(teiji, annual_shakai, dep);
-
   const selfYachin    = withShatak ? Math.round(yachin * (1 - coR)) : yachin;
   const annual_yachin = selfYachin * 12;
-
   const annual_tedori = teiji - annual_shakai - annual_shotoku - annual_jumin - annual_yachin;
-
-  // 月換算（表示用）
   const m_shakai  = Math.round(annual_shakai / 12);
   const m_shotoku = Math.round(annual_shotoku / 12);
   const m_jumin   = Math.round(annual_jumin / 12);
   const m_tedori  = Math.round(annual_tedori / 12);
-
-  // 会社負担
   const co_shakai = Math.round(h * kenpoRate) + (age >= 40 ? Math.round(h * 0.0080) : 0)
     + Math.round(h * 0.0915) + Math.round(monthly * 0.0085);
   const co_yachin = withShatak ? Math.round(yachin * coR) : 0;
-
   return {
     teiji, monthly, annualBonus, h,
     kenpo, kaigo, kosei, koyo, monthly_shakai,
@@ -126,301 +109,274 @@ const yen2 = (v) => `${Math.round(v / 10000).toLocaleString()}万円`;
 const man  = (v) => +(v / 10000).toFixed(1);
 
 // ─────────────────────────────────────────────────────────────
-// UI パーツ
+// Apple Design System カラー定数
 // ─────────────────────────────────────────────────────────────
-const SectionLabel = ({ children }) => (
+const C = {
+  bg:           "#000000",
+  surface:      "#1C1C1E",
+  surface2:     "#2C2C2E",
+  surface3:     "#3A3A3C",
+  labelPrimary: "#FFFFFF",
+  labelSecond:  "rgba(235,235,245,0.6)",
+  labelThird:   "rgba(235,235,245,0.3)",
+  separator:    "rgba(84,84,88,0.65)",
+  blue:         "#0A84FF",
+  green:        "#30D158",
+  orange:       "#FF9F0A",
+  red:          "#FF453A",
+  gray:         "#8E8E93",
+  gray2:        "#636366",
+  formBg:       "#FFFFFF",
+  formSurface:  "#F2F2F7",
+  formLabel:    "#1C1C1E",
+  formSecond:   "#3C3C43",
+  formBorder:   "rgba(60,60,67,0.18)",
+  formSep:      "rgba(60,60,67,0.1)",
+};
+
+// ─────────────────────────────────────────────────────────────
+// UI コンポーネント
+// ─────────────────────────────────────────────────────────────
+
+const SectionLabel = ({ children, light }) => (
   <div style={{
-    fontSize: 10, fontWeight: 800, color: "#64748b", letterSpacing: "0.12em",
-    textTransform: "uppercase", marginBottom: 10, display: "flex", alignItems: "center", gap: 6,
+    fontSize: 11, fontWeight: 600,
+    color: light ? C.formSecond : C.labelSecond,
+    letterSpacing: "0.06em", textTransform: "uppercase",
+    marginBottom: 12,
   }}>
-    <span style={{ width: 16, height: 1.5, background: "#334155", display: "inline-block" }} />
     {children}
   </div>
 );
 
 const Badge = ({ approx }) => (
   <span style={{
-    fontSize: 9, padding: "1px 5px", borderRadius: 3, marginLeft: 4,
-    background: approx ? "#fef3c7" : "#dbeafe",
-    color: approx ? "#92400e" : "#1e40af",
-    fontWeight: 700, letterSpacing: "0.04em", verticalAlign: "middle",
+    fontSize: 9, padding: "2px 6px", borderRadius: 4, marginLeft: 5,
+    background: approx ? "rgba(255,159,10,0.15)" : "rgba(10,132,255,0.15)",
+    color: approx ? C.orange : C.blue,
+    fontWeight: 600, letterSpacing: "0.03em", verticalAlign: "middle",
   }}>{approx ? "概算" : "確定"}</span>
 );
 
-const Row = ({ label, value, approx, bold, muted, highlight }) => (
+// フォーム内 Row（白カード用）
+const FormRow = ({ label, value, approx, bold, muted }) => (
   <div style={{
     display: "flex", justifyContent: "space-between", alignItems: "center",
-    padding: bold ? "9px 10px" : "5px 2px",
-    borderBottom: "1px solid #f1f5f9",
-    background: bold ? (highlight ? "#f0fdf4" : "#eff6ff") : "transparent",
-    borderRadius: bold ? 6 : 0,
-    marginBottom: bold ? 2 : 0,
+    padding: "8px 0",
+    borderBottom: `1px solid ${C.formSep}`,
   }}>
-    <span style={{ fontSize: muted ? 11 : 13, color: muted ? "#94a3b8" : "#475569", fontWeight: bold ? 700 : 400 }}>
+    <span style={{
+      fontSize: muted ? 12 : 13,
+      color: muted ? C.gray : C.formSecond,
+      fontWeight: bold ? 600 : 400,
+    }}>
       {label}{approx !== undefined && <Badge approx={approx} />}
     </span>
     <span style={{
-      fontSize: muted ? 11 : 13,
-      fontWeight: bold ? 800 : 500,
-      color: bold ? (highlight ? "#166534" : "#1d4ed8") : "#1e293b",
+      fontSize: muted ? 12 : 13,
+      fontWeight: bold ? 700 : 500,
+      color: bold ? C.blue : C.formLabel,
     }}>
       {value}
     </span>
   </div>
 );
 
+// 結果カード内 Row（ダークカード用）
+const Row = ({ label, value, approx, bold, muted, green }) => (
+  <div style={{
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    padding: bold ? "10px 12px" : "7px 0",
+    borderBottom: `1px solid ${C.separator}`,
+    background: bold ? (green ? "rgba(48,209,88,0.1)" : "rgba(10,132,255,0.1)") : "transparent",
+    borderRadius: bold ? 8 : 0,
+    marginBottom: bold ? 2 : 0,
+  }}>
+    <span style={{
+      fontSize: muted ? 12 : 13,
+      color: muted ? C.gray : C.labelSecond,
+      fontWeight: bold ? 600 : 400,
+    }}>
+      {label}{approx !== undefined && <Badge approx={approx} />}
+    </span>
+    <span style={{
+      fontSize: muted ? 12 : 13,
+      fontWeight: bold ? 700 : 500,
+      color: bold ? (green ? C.green : C.blue) : C.labelPrimary,
+    }}>
+      {value}
+    </span>
+  </div>
+);
+
+// +/- 数値入力（フォーム用）
 const NumInput = ({ val, setter, min, max, step = 1, onDone, isMobile }) => (
   <div style={{
     display: "flex", alignItems: "center",
-    border: "1.5px solid #e2e8f0", borderRadius: 8, overflow: "hidden", background: "#f8fafc",
-    transition: "border-color 0.2s",
+    border: `1px solid ${C.formBorder}`,
+    borderRadius: 10, overflow: "hidden",
+    background: C.formSurface,
   }}>
     <button
       onClick={() => { setter(v => +(Math.max(min, +v - step).toFixed(2))); onDone(); }}
       style={{
-        padding: isMobile ? "13px 18px" : "9px 14px", background: "none", border: "none",
-        fontSize: 18, color: "#64748b", cursor: "pointer",
-        borderRight: "1px solid #e2e8f0", lineHeight: 1, fontFamily: "inherit",
+        padding: isMobile ? "13px 18px" : "10px 16px",
+        background: "none", border: "none",
+        fontSize: 18, color: C.blue, cursor: "pointer",
+        borderRight: `1px solid ${C.formBorder}`,
+        lineHeight: 1, fontFamily: "inherit", fontWeight: 300,
       }}>−</button>
     <input
       type="number" value={val}
       onChange={e => { setter(+e.target.value); onDone(); }}
       style={{
-        flex: 1, padding: isMobile ? "13px 4px" : "9px 4px", border: "none", borderRadius: 0,
-        textAlign: "center", fontSize: isMobile ? 16 : 14, background: "#f8fafc",
-        outline: "none", fontFamily: "inherit",
+        flex: 1, padding: isMobile ? "13px 4px" : "10px 4px",
+        border: "none", background: "transparent",
+        textAlign: "center",
+        fontSize: isMobile ? 16 : 14,
+        color: C.formLabel, outline: "none",
+        fontFamily: "inherit", fontWeight: 500,
       }}
       min={min} max={max} step={step}
     />
     <button
       onClick={() => { setter(v => +(Math.min(max, +v + step).toFixed(2))); onDone(); }}
       style={{
-        padding: isMobile ? "13px 18px" : "9px 14px", background: "none", border: "none",
-        fontSize: 18, color: "#64748b", cursor: "pointer",
-        borderLeft: "1px solid #e2e8f0", lineHeight: 1, fontFamily: "inherit",
+        padding: isMobile ? "13px 18px" : "10px 16px",
+        background: "none", border: "none",
+        fontSize: 18, color: C.blue, cursor: "pointer",
+        borderLeft: `1px solid ${C.formBorder}`,
+        lineHeight: 1, fontFamily: "inherit", fontWeight: 300,
       }}>＋</button>
   </div>
 );
 
-// ── カスタムツールチップ（グラフ用）
-const CustomTooltip = ({ active, payload, label }) => {
+// セグメントコントロール風ボタングループ
+const SegBtn = ({ active, onClick, children, isMobile }) => (
+  <button onClick={onClick} style={{
+    flex: 1,
+    padding: isMobile ? "10px 0" : "8px 0",
+    border: "none", borderRadius: 7, cursor: "pointer",
+    fontFamily: "inherit",
+    fontSize: isMobile ? 14 : 13,
+    fontWeight: active ? 600 : 400,
+    background: active ? C.formBg : "transparent",
+    color: active ? C.blue : C.gray,
+    boxShadow: active ? "0 1px 4px rgba(0,0,0,0.12)" : "none",
+    transition: "all 0.15s",
+  }}>{children}</button>
+);
+
+// ── カスタムチャートツールチップ
+const ChartTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   const total = payload.reduce((s, p) => s + (p.value || 0), 0);
   return (
     <div style={{
-      background: "#1e293b", border: "1px solid #334155", borderRadius: 10,
-      padding: "10px 14px", boxShadow: "0 8px 24px rgba(0,0,0,0.4)", minWidth: 160,
+      background: C.surface2,
+      border: `1px solid ${C.separator}`,
+      borderRadius: 12,
+      padding: "10px 14px",
+      boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+      minWidth: 160,
     }}>
-      <div style={{ color: "#94a3b8", fontSize: 11, fontWeight: 700, marginBottom: 6 }}>{label}</div>
+      <div style={{ color: C.labelSecond, fontSize: 11, fontWeight: 600, marginBottom: 8 }}>{label}</div>
       {payload.map(p => (
-        <div key={p.name} style={{ display: "flex", justifyContent: "space-between", gap: 16, marginBottom: 3 }}>
+        <div key={p.name} style={{
+          display: "flex", justifyContent: "space-between",
+          gap: 16, marginBottom: 4,
+        }}>
           <span style={{ color: p.fill, fontSize: 11 }}>● {p.name}</span>
-          <span style={{ color: "#f1f5f9", fontSize: 11, fontWeight: 600 }}>{p.value.toFixed(1)}万円</span>
+          <span style={{ color: C.labelPrimary, fontSize: 11, fontWeight: 600 }}>{p.value.toFixed(1)}万円</span>
         </div>
       ))}
-      <div style={{ borderTop: "1px solid #334155", marginTop: 6, paddingTop: 6, display: "flex", justifyContent: "space-between" }}>
-        <span style={{ color: "#64748b", fontSize: 11 }}>月収合計</span>
-        <span style={{ color: "#fff", fontSize: 11, fontWeight: 700 }}>{total.toFixed(1)}万円</span>
+      <div style={{
+        borderTop: `1px solid ${C.separator}`,
+        marginTop: 8, paddingTop: 8,
+        display: "flex", justifyContent: "space-between",
+      }}>
+        <span style={{ color: C.labelSecond, fontSize: 11 }}>合計</span>
+        <span style={{ color: C.labelPrimary, fontSize: 11, fontWeight: 700 }}>{total.toFixed(1)}万円</span>
       </div>
     </div>
   );
 };
 
-// ── 理論年収・年間負担内訳テーブル
-const CostSummaryTable = ({ no, yes, nenshu, coRatio, isMobile }) => {
-  // 理論年収（提示年収）= 借上社宅の会社負担分を含まない純粋な給与オファー額
-  // 社宅なし・社宅あり 両方とも同値（借上社宅は理論年収に含まない）
-  const totalNenshu = nenshu * 10000;
-
-  const noPersonal  = no.annual_yachin + no.annual_shakai + no.annual_shotoku + no.annual_jumin;
-  const yesPersonal = yes.annual_yachin + yes.annual_shakai + yes.annual_shotoku + yes.annual_jumin;
-  const noCompany   = no.companyTotal * 12;
-  const yesCompany  = yes.companyTotal * 12;
-
-  const TH = ({ children, accent }) => (
-    <th style={{
-      padding: isMobile ? "8px 6px" : "10px 14px",
-      fontSize: isMobile ? 11 : 12, fontWeight: 800,
-      color: accent ? "#fff" : "#475569",
-      background: accent ?? "#f8fafc",
-      textAlign: "center", borderBottom: "2px solid #e2e8f0",
-      whiteSpace: "nowrap",
-    }}>{children}</th>
-  );
-
-  const TD = ({ children, bold, highlight, sub, right }) => (
-    <td style={{
-      padding: isMobile ? "7px 6px" : "9px 14px",
-      fontSize: isMobile ? 11 : 12,
-      fontWeight: bold ? 800 : sub ? 400 : 500,
-      color: highlight === "green" ? "#16a34a" : highlight === "blue" ? "#1d4ed8" : sub ? "#94a3b8" : "#1e293b",
-      textAlign: right ? "right" : "left",
-      borderBottom: "1px solid #f1f5f9",
-      background: bold ? (highlight === "green" ? "#f0fdf4" : highlight === "blue" ? "#eff6ff" : "#f8fafc") : "transparent",
-      whiteSpace: "nowrap",
-    }}>{children}</td>
-  );
-
-  const SepRow = ({ label }) => (
-    <tr>
-      <td colSpan={3} style={{
-        padding: "8px 14px 4px",
-        fontSize: 10, fontWeight: 800, color: "#64748b",
-        letterSpacing: "0.1em", background: "#f8fafc",
-        borderBottom: "1px solid #e2e8f0",
-      }}>{label}</td>
-    </tr>
-  );
-
-  return (
-    <div style={{
-      background: "#fff", borderRadius: 14, overflow: "hidden",
-      boxShadow: "0 4px 20px rgba(0,0,0,0.08)", marginBottom: 16,
-      border: "1px solid #e2e8f0",
-    }}>
-      <div style={{ padding: isMobile ? "14px 12px 10px" : "18px 20px 12px" }}>
-        <SectionLabel>理論年収・年間負担内訳（概算）</SectionLabel>
-      </div>
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
-          <colgroup>
-            <col style={{ width: isMobile ? "42%" : "44%" }} />
-            <col style={{ width: isMobile ? "29%" : "28%" }} />
-            <col style={{ width: isMobile ? "29%" : "28%" }} />
-          </colgroup>
-          <thead>
-            <tr>
-              <TH> </TH>
-              <TH accent="#475569">社宅なし</TH>
-              <TH accent="#1d4ed8">社宅あり ✦</TH>
-            </tr>
-          </thead>
-          <tbody>
-            {/* 理論年収 */}
-            <tr>
-              <TD bold>理論年収（提示年収）</TD>
-              <TD bold right highlight="blue">{yen2(totalNenshu)}</TD>
-              <TD bold right highlight="blue">{yen2(totalNenshu)}</TD>
-            </tr>
-
-            {/* 企業支払い */}
-            <SepRow label="▼ 企業支払い（年間）" />
-            <tr>
-              <TD sub>　給与</TD>
-              <TD right>{yen2(no.teiji)}</TD>
-              <TD right>{yen2(yes.teiji)}</TD>
-            </tr>
-            <tr>
-              <TD sub>　会社負担社保</TD>
-              <TD right>{yen2(no.co_shakai * 12)}</TD>
-              <TD right>{yen2(yes.co_shakai * 12)}</TD>
-            </tr>
-            <tr>
-              <TD sub>　社宅家賃（会社負担）</TD>
-              <TD right sub>−</TD>
-              <TD right>{yen2(yes.co_yachin * 12)}</TD>
-            </tr>
-            <tr>
-              <TD bold>　＝ 企業合計</TD>
-              <TD bold right>{yen2(noCompany)}</TD>
-              <TD bold right>{yen2(yesCompany)}</TD>
-            </tr>
-
-            {/* 個人負担 */}
-            <SepRow label="▼ 個人負担（年間）" />
-            <tr>
-              <TD sub>　家賃自己負担</TD>
-              <TD right>{yen2(no.annual_yachin)}</TD>
-              <TD right>{yen2(yes.annual_yachin)}</TD>
-            </tr>
-            <tr>
-              <TD sub>　社保（本人）</TD>
-              <TD right>{yen2(no.annual_shakai)}</TD>
-              <TD right>{yen2(yes.annual_shakai)}</TD>
-            </tr>
-            <tr>
-              <TD sub>　税金（所得税＋住民税）</TD>
-              <TD right>{yen2(no.annual_shotoku + no.annual_jumin)}</TD>
-              <TD right>{yen2(yes.annual_shotoku + yes.annual_jumin)}</TD>
-            </tr>
-            <tr>
-              <TD bold>　＝ 個人負担合計</TD>
-              <TD bold right>{yen2(noPersonal)}</TD>
-              <TD bold right>{yen2(yesPersonal)}</TD>
-            </tr>
-
-            {/* 手取り */}
-            <SepRow label="▼ 結果" />
-            <tr>
-              <TD bold>年間手取り（実質）概算</TD>
-              <TD bold right>{yen2(no.annual_tedori)}</TD>
-              <TD bold right highlight="green">{yen2(yes.annual_tedori)}</TD>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div style={{ padding: "8px 16px 12px", fontSize: 10, color: "#94a3b8", lineHeight: 1.6 }}>
-        ※ 理論年収（提示年収）は借上社宅の会社負担分を含まない純粋な給与額。社宅ありの場合も同額を基準とし、企業は給与を下げた分を社宅費として別途負担します。住民税は概算。
-      </div>
-    </div>
-  );
+// ── 月収内訳グラフ
+const CHART_COLORS = {
+  手取り: C.green,
+  社保:   C.gray2,
+  所得税: C.orange,
+  住民税: "#FF6B00",
+  家賃:   C.red,
 };
 
-// ── 比較グラフ
 const CompareChart = ({ no, yes, isMobile }) => {
   const data = [
     {
       name: "社宅なし",
       手取り: man(no.m_tedori),
-      社保: man(no.m_shakai),
+      社保:   man(no.m_shakai),
       所得税: man(no.m_shotoku),
       住民税: man(no.m_jumin),
-      家賃: man(no.selfYachin),
+      家賃:   man(no.selfYachin),
     },
     {
       name: "社宅あり",
       手取り: man(yes.m_tedori),
-      社保: man(yes.m_shakai),
+      社保:   man(yes.m_shakai),
       所得税: man(yes.m_shotoku),
       住民税: man(yes.m_jumin),
-      家賃: man(yes.selfYachin),
+      家賃:   man(yes.selfYachin),
     },
   ];
 
-  const COLORS = {
-    手取り: "#22c55e",
-    社保: "#64748b",
-    所得税: "#f97316",
-    住民税: "#f59e0b",
-    家賃: "#ef4444",
-  };
-
   return (
     <div style={{
-      background: "#fff", borderRadius: 14, padding: isMobile ? "18px 12px 12px" : "22px 24px 16px",
-      boxShadow: "0 4px 20px rgba(0,0,0,0.08)", marginBottom: 16,
-      border: "1px solid #e2e8f0",
+      background: C.surface,
+      borderRadius: 16,
+      padding: isMobile ? "18px 12px 14px" : "22px 24px 16px",
+      marginBottom: 12,
+      border: `1px solid ${C.separator}`,
     }}>
       <SectionLabel>月収内訳グラフ（万円）</SectionLabel>
-      <ResponsiveContainer width="100%" height={isMobile ? 200 : 220}>
-        <BarChart data={data} layout="vertical" barCategoryGap="30%" margin={{ left: 10, right: 30, top: 0, bottom: 0 }}>
-          <XAxis type="number" tickFormatter={v => `${v}万`} tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-          <YAxis type="category" dataKey="name" tick={{ fontSize: isMobile ? 11 : 12, fill: "#475569", fontWeight: 700 }} axisLine={false} tickLine={false} width={52} />
-          <Tooltip content={<CustomTooltip />} />
-          {Object.entries(COLORS).map(([key, color]) => (
-            <Bar key={key} dataKey={key} stackId="a" fill={color} radius={key === "家賃" ? [0, 4, 4, 0] : 0}>
+      <ResponsiveContainer width="100%" height={isMobile ? 190 : 210}>
+        <BarChart data={data} layout="vertical" barCategoryGap="30%"
+          margin={{ left: 8, right: 36, top: 0, bottom: 0 }}>
+          <XAxis type="number"
+            tickFormatter={v => `${v}万`}
+            tick={{ fontSize: 10, fill: C.gray }}
+            axisLine={false} tickLine={false} />
+          <YAxis type="category" dataKey="name"
+            tick={{ fontSize: isMobile ? 12 : 13, fill: C.labelSecond, fontWeight: 500 }}
+            axisLine={false} tickLine={false} width={56} />
+          <Tooltip content={<ChartTooltip />} />
+          {Object.entries(CHART_COLORS).map(([key, color]) => (
+            <Bar key={key} dataKey={key} stackId="a" fill={color}
+              radius={key === "家賃" ? [0, 4, 4, 0] : 0}>
               {key === "手取り" && (
-                <LabelList dataKey={key} position="insideLeft" formatter={v => v > 3 ? `${v}万` : ""} style={{ fill: "#fff", fontSize: 10, fontWeight: 700 }} />
+                <LabelList dataKey={key} position="insideLeft"
+                  formatter={v => v > 3 ? `${v}万` : ""}
+                  style={{ fill: "#fff", fontSize: 10, fontWeight: 600 }} />
               )}
             </Bar>
           ))}
         </BarChart>
       </ResponsiveContainer>
-      {/* 凡例 */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", marginTop: 10, justifyContent: "center" }}>
-        {Object.entries(COLORS).map(([k, c]) => (
-          <span key={k} style={{ fontSize: 10, color: "#475569", display: "flex", alignItems: "center", gap: 4 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: c, display: "inline-block" }} />
+      <div style={{
+        display: "flex", flexWrap: "wrap",
+        gap: "6px 16px", marginTop: 12,
+        justifyContent: "center",
+      }}>
+        {Object.entries(CHART_COLORS).map(([k, c]) => (
+          <span key={k} style={{
+            fontSize: 11, color: C.labelSecond,
+            display: "flex", alignItems: "center", gap: 5,
+          }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: 2,
+              background: c, display: "inline-block",
+            }} />
             {k}
           </span>
         ))}
@@ -429,42 +385,220 @@ const CompareChart = ({ no, yes, isMobile }) => {
   );
 };
 
+// ── 理論年収・年間負担内訳テーブル
+const CostSummaryTable = ({ no, yes, nenshu, coRatio, isMobile }) => {
+  // 理論年収（提示年収）= 借上社宅の会社負担分を含まない純粋な給与オファー額
+  const totalNenshu = nenshu * 10000;
+  const noPersonal  = no.annual_yachin + no.annual_shakai + no.annual_shotoku + no.annual_jumin;
+  const yesPersonal = yes.annual_yachin + yes.annual_shakai + yes.annual_shotoku + yes.annual_jumin;
+  const noCompany   = no.companyTotal * 12;
+  const yesCompany  = yes.companyTotal * 12;
+
+  const TH = ({ children, accent, right }) => (
+    <th style={{
+      padding: isMobile ? "8px 8px" : "11px 16px",
+      fontSize: isMobile ? 11 : 12,
+      fontWeight: 600,
+      color: accent ? C.labelPrimary : C.labelSecond,
+      background: accent === "no" ? C.surface3
+                : accent === "yes" ? C.blue
+                : C.surface2,
+      textAlign: right ? "right" : "left",
+      borderBottom: `1px solid ${C.separator}`,
+      whiteSpace: "nowrap",
+    }}>{children}</th>
+  );
+
+  const TD = ({ children, bold, green, blue, muted, right }) => (
+    <td style={{
+      padding: isMobile ? "7px 8px" : "9px 16px",
+      fontSize: isMobile ? 11 : 12,
+      fontWeight: bold ? 700 : muted ? 400 : 500,
+      color: green ? C.green : blue ? C.blue : muted ? C.gray : C.labelPrimary,
+      textAlign: right ? "right" : "left",
+      borderBottom: `1px solid ${C.separator}`,
+      background: bold && (green || blue) ? (green ? "rgba(48,209,88,0.08)" : "rgba(10,132,255,0.08)") : "transparent",
+      whiteSpace: "nowrap",
+    }}>{children}</td>
+  );
+
+  const SepRow = ({ label }) => (
+    <tr>
+      <td colSpan={3} style={{
+        padding: isMobile ? "8px 8px 5px" : "10px 16px 6px",
+        fontSize: 10, fontWeight: 600,
+        color: C.labelSecond,
+        letterSpacing: "0.08em",
+        background: C.surface2,
+        borderBottom: `1px solid ${C.separator}`,
+        textTransform: "uppercase",
+      }}>{label}</td>
+    </tr>
+  );
+
+  return (
+    <div style={{
+      background: C.surface,
+      borderRadius: 16,
+      overflow: "hidden",
+      marginBottom: 12,
+      border: `1px solid ${C.separator}`,
+    }}>
+      <div style={{ padding: isMobile ? "16px 16px 10px" : "20px 24px 12px" }}>
+        <SectionLabel>理論年収・年間負担内訳（概算）</SectionLabel>
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <colgroup>
+            <col style={{ width: isMobile ? "42%" : "44%" }} />
+            <col style={{ width: isMobile ? "29%" : "28%" }} />
+            <col style={{ width: isMobile ? "29%" : "28%" }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <TH> </TH>
+              <TH accent="no" right>社宅なし</TH>
+              <TH accent="yes" right>社宅あり</TH>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <TD bold blue>理論年収（提示年収）</TD>
+              <TD bold blue right>{yen2(totalNenshu)}</TD>
+              <TD bold blue right>{yen2(totalNenshu)}</TD>
+            </tr>
+
+            <SepRow label="企業支払い（年間）" />
+            <tr>
+              <TD muted>　給与</TD>
+              <TD right>{yen2(no.teiji)}</TD>
+              <TD right>{yen2(yes.teiji)}</TD>
+            </tr>
+            <tr>
+              <TD muted>　会社負担社保</TD>
+              <TD right>{yen2(no.co_shakai * 12)}</TD>
+              <TD right>{yen2(yes.co_shakai * 12)}</TD>
+            </tr>
+            <tr>
+              <TD muted>　社宅家賃（会社負担）</TD>
+              <TD muted right>−</TD>
+              <TD right>{yen2(yes.co_yachin * 12)}</TD>
+            </tr>
+            <tr>
+              <TD bold>　企業合計</TD>
+              <TD bold right>{yen2(noCompany)}</TD>
+              <TD bold right>{yen2(yesCompany)}</TD>
+            </tr>
+
+            <SepRow label="個人負担（年間）" />
+            <tr>
+              <TD muted>　家賃自己負担</TD>
+              <TD right>{yen2(no.annual_yachin)}</TD>
+              <TD right>{yen2(yes.annual_yachin)}</TD>
+            </tr>
+            <tr>
+              <TD muted>　社保（本人）</TD>
+              <TD right>{yen2(no.annual_shakai)}</TD>
+              <TD right>{yen2(yes.annual_shakai)}</TD>
+            </tr>
+            <tr>
+              <TD muted>　税金（所得税＋住民税）</TD>
+              <TD right>{yen2(no.annual_shotoku + no.annual_jumin)}</TD>
+              <TD right>{yen2(yes.annual_shotoku + yes.annual_jumin)}</TD>
+            </tr>
+            <tr>
+              <TD bold>　個人負担合計</TD>
+              <TD bold right>{yen2(noPersonal)}</TD>
+              <TD bold right>{yen2(yesPersonal)}</TD>
+            </tr>
+
+            <SepRow label="結果" />
+            <tr>
+              <TD bold green>年間手取り（実質）</TD>
+              <TD bold right>{yen2(no.annual_tedori)}</TD>
+              <TD bold green right>{yen2(yes.annual_tedori)}</TD>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style={{
+        padding: isMobile ? "10px 16px 14px" : "10px 24px 16px",
+        fontSize: 11, color: C.gray, lineHeight: 1.6,
+      }}>
+        理論年収は借上社宅の会社負担分を含まない提示給与額。住民税は概算。
+      </div>
+    </div>
+  );
+};
+
 // ── 詳細カード
-const PatternCard = ({ title, subtitle, accent, data, badge, isMobile }) => (
+const PatternCard = ({ title, isRecommended, data, coRatio, isMobile }) => (
   <div style={{
-    flex: 1, minWidth: 0, borderRadius: 14, overflow: "hidden",
-    border: badge ? `2px solid ${accent}` : "1px solid #e2e8f0",
-    background: "#fff",
-    boxShadow: badge ? `0 8px 32px ${accent}22` : "0 2px 12px rgba(0,0,0,0.06)",
-    transition: "box-shadow 0.2s",
+    flex: 1, minWidth: 0,
+    borderRadius: 16, overflow: "hidden",
+    background: C.surface,
+    border: isRecommended
+      ? `1px solid ${C.blue}`
+      : `1px solid ${C.separator}`,
+    boxShadow: isRecommended ? `0 0 0 1px ${C.blue}22` : "none",
   }}>
-    <div style={{ background: accent, padding: "14px 18px", position: "relative" }}>
-      {badge && (
+    {/* カードヘッダー */}
+    <div style={{
+      background: isRecommended ? C.blue : C.surface2,
+      padding: "14px 18px",
+      position: "relative",
+    }}>
+      {isRecommended && (
         <div style={{
-          position: "absolute", top: 10, right: 12,
-          background: "rgba(255,255,255,0.22)", color: "#fff",
-          fontSize: 9, fontWeight: 800, padding: "2px 8px", borderRadius: 8, letterSpacing: "0.08em",
+          position: "absolute", top: 10, right: 14,
+          background: "rgba(255,255,255,0.2)",
+          color: "#fff", fontSize: 9, fontWeight: 700,
+          padding: "2px 8px", borderRadius: 6,
+          letterSpacing: "0.08em",
         }}>推奨</div>
       )}
-      <div style={{ color: "#fff", fontWeight: 800, fontSize: 15 }}>{title}</div>
-      <div style={{ color: "rgba(255,255,255,0.65)", fontSize: 11, marginTop: 3 }}>{subtitle}</div>
+      <div style={{
+        color: C.labelPrimary,
+        fontWeight: 700, fontSize: 15, marginBottom: 3,
+      }}>{title}</div>
+      <div style={{
+        color: isRecommended ? "rgba(255,255,255,0.65)" : C.labelSecond,
+        fontSize: 11,
+      }}>
+        月給 {yen2(data.monthly)}
+        {isRecommended ? `　家賃の${coRatio}%を会社負担` : "　家賃全額自己負担"}
+      </div>
     </div>
-    <div style={{ padding: "14px 16px" }}>
+
+    <div style={{ padding: "16px 18px" }}>
       {/* 手取りハイライト */}
       <div style={{
-        background: badge ? "#f0fdf4" : "#f8fafc",
-        border: `1px solid ${badge ? "#bbf7d0" : "#e2e8f0"}`,
-        borderRadius: 10, padding: "12px 14px", marginBottom: 12, textAlign: "center",
+        background: isRecommended ? "rgba(48,209,88,0.1)" : C.surface2,
+        border: `1px solid ${isRecommended ? "rgba(48,209,88,0.3)" : C.separator}`,
+        borderRadius: 12, padding: "14px 16px",
+        marginBottom: 16, textAlign: "center",
       }}>
-        <div style={{ fontSize: 10, color: "#64748b", fontWeight: 700, marginBottom: 2 }}>月間手取り（実質）概算</div>
-        <div style={{ fontSize: 9, color: "#94a3b8", marginBottom: 4 }}>※家賃支払い完了後</div>
-        <div style={{ fontSize: isMobile ? 26 : 24, fontWeight: 900, color: badge ? "#16a34a" : "#1e293b" }}>
+        <div style={{ fontSize: 10, color: C.labelSecond, fontWeight: 600, marginBottom: 3 }}>
+          月間手取り（実質）
+        </div>
+        <div style={{ fontSize: 10, color: C.gray, marginBottom: 8 }}>家賃支払い完了後</div>
+        <div style={{
+          fontSize: isMobile ? 26 : 24,
+          fontWeight: 700,
+          color: isRecommended ? C.green : C.labelPrimary,
+          letterSpacing: "-0.02em",
+        }}>
           {yen(data.m_tedori)}
         </div>
-        <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>年間 {yen2(data.annual_tedori)}</div>
+        <div style={{ fontSize: 11, color: C.labelSecond, marginTop: 4 }}>
+          年間 {yen2(data.annual_tedori)}　概算
+        </div>
       </div>
 
-      <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 700, marginBottom: 4, letterSpacing: "0.08em" }}>社会保険料（月次・本人負担）</div>
+      {/* 社会保険 */}
+      <div style={{ fontSize: 10, color: C.gray, fontWeight: 600, marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+        社会保険料（月次・本人負担）
+      </div>
       <Row label="健康保険" value={`−${yen(data.kenpo)}`} muted />
       {data.kaigo > 0 && <Row label="介護保険" value={`−${yen(data.kaigo)}`} muted />}
       <Row label="厚生年金" value={`−${yen(data.kosei)}`} muted />
@@ -474,19 +608,29 @@ const PatternCard = ({ title, subtitle, accent, data, badge, isMobile }) => (
         <Row label="賞与時社保（年間）" value={`−${yen(data.bonus_shakai)}`} muted />
       )}
 
-      <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 700, margin: "10px 0 4px", letterSpacing: "0.08em" }}>税金（月換算）</div>
+      {/* 税金 */}
+      <div style={{ fontSize: 10, color: C.gray, fontWeight: 600, margin: "12px 0 8px", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+        税金（月換算）
+      </div>
       <Row label="所得税" value={`−${yen(data.m_shotoku)}`} approx={false} muted />
       <Row label="住民税" value={`−${yen(data.m_jumin)}`} approx={true} muted />
 
-      <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 700, margin: "10px 0 4px", letterSpacing: "0.08em" }}>家賃</div>
+      {/* 家賃 */}
+      <div style={{ fontSize: 10, color: C.gray, fontWeight: 600, margin: "12px 0 8px", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+        家賃
+      </div>
       <Row label="自己負担" value={`−${yen(data.selfYachin)}/月`} muted />
 
       {/* 会社コスト */}
       <div style={{
-        marginTop: 12, padding: "10px 12px", background: "#f8fafc",
-        borderRadius: 8, border: "1px dashed #e2e8f0",
+        marginTop: 14, padding: "12px 14px",
+        background: C.surface2,
+        borderRadius: 10,
+        border: `1px solid ${C.separator}`,
       }}>
-        <div style={{ fontSize: 10, color: "#64748b", fontWeight: 700, marginBottom: 4 }}>会社コスト（月間）</div>
+        <div style={{ fontSize: 10, color: C.gray, fontWeight: 600, marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+          会社コスト（月間）
+        </div>
         <Row label="月給" value={yen(data.monthly)} muted />
         <Row label="会社負担社保" value={`+${yen(data.co_shakai)}`} muted />
         {data.co_yachin > 0 && <Row label="社宅家賃負担" value={`+${yen(data.co_yachin)}`} muted />}
@@ -500,17 +644,17 @@ const PatternCard = ({ title, subtitle, accent, data, badge, isMobile }) => (
 // メインアプリ
 // ─────────────────────────────────────────────────────────────
 export default function App() {
-  const [nenshu,    setNenshu]    = useState(500);
-  const [yachin,    setYachin]    = useState(10);
-  const [age,       setAge]       = useState(30);
-  const [dep,       setDep]       = useState(0);
-  const [pref,      setPref]      = useState("京都");
-  const [bonus,     setBonus]     = useState(2);
-  const [coRatio,   setCoRatio]   = useState(80); // 社宅会社負担割合（%）
-  const [ran,       setRan]       = useState(false);
-  const [mode,      setMode]      = useState("candidate");
-  const [copied,    setCopied]    = useState("");
-  const [isMobile,  setIsMobile]  = useState(window.innerWidth < 640);
+  const [nenshu,   setNenshu]   = useState(500);
+  const [yachin,   setYachin]   = useState(10);
+  const [age,      setAge]      = useState(30);
+  const [dep,      setDep]      = useState(0);
+  const [pref,     setPref]     = useState("京都");
+  const [bonus,    setBonus]    = useState(2);
+  const [coRatio,  setCoRatio]  = useState(80);
+  const [ran,      setRan]      = useState(false);
+  const [mode,     setMode]     = useState("candidate");
+  const [copied,   setCopied]   = useState("");
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 640);
@@ -518,7 +662,6 @@ export default function App() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // URLハッシュからパラメータ読み込み
   useEffect(() => {
     const hash = window.location.hash.replace("#", "");
     if (!hash) return;
@@ -529,7 +672,7 @@ export default function App() {
       if (p.get("a")) setAge(+p.get("a"));
       if (p.get("d")) setDep(+p.get("d"));
       if (p.get("p") && KENPO_RATES[p.get("p")]) setPref(p.get("p"));
-      if (p.get("b") !== null && p.get("b") !== undefined) setBonus(+p.get("b"));
+      if (p.get("b") != null) setBonus(+p.get("b"));
       if (p.get("r")) setCoRatio(Math.min(100, Math.max(50, +p.get("r"))));
       setRan(true);
       setMode("candidate");
@@ -566,7 +709,7 @@ export default function App() {
   const handleCopyResult = useCallback(async () => {
     if (!result) return;
     const { no, yes } = result;
-    const nenshuYen = nenshu * 10000; // 理論年収（提示年収）
+    const nenshuYen = nenshu * 10000;
     const noPersonal  = no.annual_yachin + no.annual_shakai + no.annual_shotoku + no.annual_jumin;
     const yesPersonal = yes.annual_yachin + yes.annual_shakai + yes.annual_shotoku + yes.annual_jumin;
     const text = [
@@ -589,20 +732,20 @@ export default function App() {
       `  月給（額面）        : ${yen2(no.monthly)}${bonus > 0 ? `　賞与: ${yen2(no.annualBonus)}/年` : ""}`,
       `  家賃自己負担        : ${yen(no.selfYachin)}/月（年間 ${yen2(no.annual_yachin)}）`,
       "",
-      "  ▼ 企業支払い（年間）",
+      "  企業支払い（年間）",
       `    給与              : ${yen2(no.teiji)}`,
       `    会社負担社保      : ${yen2(no.co_shakai * 12)}`,
       `    社宅費用          : −（なし）`,
-      `    ＝ 企業合計       : ${yen2(no.companyTotal * 12)}`,
+      `    企業合計          : ${yen2(no.companyTotal * 12)}`,
       "",
-      "  ▼ 個人負担（年間）",
+      "  個人負担（年間）",
       `    家賃              : ${yen2(no.annual_yachin)}`,
       `    社保（本人）      : ${yen2(no.annual_shakai)}`,
-      `    税金（所得税+住民税）: ${yen2(no.annual_shotoku + no.annual_jumin)}`,
-      `    ＝ 個人負担合計   : ${yen2(noPersonal)}`,
+      `    税金              : ${yen2(no.annual_shotoku + no.annual_jumin)}`,
+      `    個人負担合計      : ${yen2(noPersonal)}`,
       "",
-      `  年間手取り（実質）  : ${yen2(no.annual_tedori)}　※概算`,
-      `  月間手取り（実質）  : ${yen(no.m_tedori)}　※家賃支払い後`,
+      `  年間手取り（実質）  : ${yen2(no.annual_tedori)}（概算）`,
+      `  月間手取り（実質）  : ${yen(no.m_tedori)}（家賃支払い後）`,
       "",
       "───────────────────────────────────────",
       `【社宅あり（会社${coRatio}%負担）】`,
@@ -611,158 +754,206 @@ export default function App() {
       `  家賃自己負担        : ${yen(yes.selfYachin)}/月（年間 ${yen2(yes.annual_yachin)}）`,
       `  社宅会社負担        : ${yen(yes.co_yachin)}/月（年間 ${yen2(yes.co_yachin * 12)}）`,
       "",
-      "  ▼ 企業支払い（年間）",
+      "  企業支払い（年間）",
       `    給与              : ${yen2(yes.teiji)}`,
       `    会社負担社保      : ${yen2(yes.co_shakai * 12)}`,
       `    社宅費用          : ${yen2(yes.co_yachin * 12)}`,
-      `    ＝ 企業合計       : ${yen2(yes.companyTotal * 12)}`,
+      `    企業合計          : ${yen2(yes.companyTotal * 12)}`,
       "",
-      "  ▼ 個人負担（年間）",
-      `    家賃（${100 - coRatio}%分）     : ${yen2(yes.annual_yachin)}`,
+      "  個人負担（年間）",
+      `    家賃（${100 - coRatio}%）       : ${yen2(yes.annual_yachin)}`,
       `    社保（本人）      : ${yen2(yes.annual_shakai)}`,
-      `    税金（所得税+住民税）: ${yen2(yes.annual_shotoku + yes.annual_jumin)}`,
-      `    ＝ 個人負担合計   : ${yen2(yesPersonal)}`,
+      `    税金              : ${yen2(yes.annual_shotoku + yes.annual_jumin)}`,
+      `    個人負担合計      : ${yen2(yesPersonal)}`,
       "",
-      `  年間手取り（実質）  : ${yen2(yes.annual_tedori)}　※概算`,
-      `  月間手取り（実質）  : ${yen(yes.m_tedori)}　※家賃支払い後`,
+      `  年間手取り（実質）  : ${yen2(yes.annual_tedori)}（概算）`,
+      `  月間手取り（実質）  : ${yen(yes.m_tedori)}（家賃支払い後）`,
       "",
       "═══════════════════════════════════════",
-      `▶ 社宅制度により年間手取りが ${diff > 0 ? "+" : ""}${yen2(diff)}（月間 ${diff > 0 ? "+" : ""}${yen(diff / 12)}）`,
+      `社宅制度により年間手取りが ${diff > 0 ? "+" : ""}${yen2(diff)}（月間 ${diff > 0 ? "+" : ""}${yen(diff / 12)}）`,
       "═══════════════════════════════════════",
       "",
-      "※ 住民税は概算値です（前年所得ベース）。",
-      `※ 協会けんぽ${pref}支部の料率を使用。厚生年金18.30%・雇用保険0.60%。`,
-      "※ 実際の金額は年末調整・確定申告・各種控除により異なります。",
+      "住民税は概算値です（前年所得ベース）。",
+      `協会けんぽ${pref}支部の料率を使用。厚生年金18.30%・雇用保険0.60%。`,
+      "実際の金額は年末調整・確定申告・各種控除により異なります。",
     ].join("\n");
     try {
       await navigator.clipboard.writeText(text);
       setCopied("text"); setTimeout(() => setCopied(""), 2500);
-    } catch {
-      alert("コピーに失敗しました。");
-    }
+    } catch { alert("コピーに失敗しました。"); }
   }, [result, diff, pref, bonus, age, dep, nenshu, yachin, coRatio]);
 
   const handlePrint = () => window.print();
   const resetRan = () => setRan(false);
 
+  // フォーム用スタイル
   const lbl = {
-    fontSize: 11, fontWeight: 700, color: "#64748b",
-    marginBottom: 6, display: "block", letterSpacing: "0.05em",
+    fontSize: 11, fontWeight: 600,
+    color: C.gray,
+    marginBottom: 7, display: "block",
+    letterSpacing: "0.04em", textTransform: "uppercase",
   };
   const selectStyle = {
-    width: "100%", padding: isMobile ? "12px 10px" : "9px 10px",
-    border: "1.5px solid #e2e8f0", borderRadius: 8, background: "#f8fafc",
-    fontSize: isMobile ? 15 : 14, color: "#1e293b", outline: "none",
-    fontFamily: "inherit", cursor: "pointer",
+    width: "100%",
+    padding: isMobile ? "12px 12px" : "10px 12px",
+    border: `1px solid ${C.formBorder}`,
+    borderRadius: 10,
+    background: C.formSurface,
+    fontSize: isMobile ? 15 : 14,
+    color: C.formLabel,
+    outline: "none",
+    fontFamily: "inherit",
+    cursor: "pointer",
     appearance: "none", WebkitAppearance: "none",
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`,
-    backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center",
-    paddingRight: 32,
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238E8E93' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`,
+    backgroundRepeat: "no-repeat",
+    backgroundPosition: "right 12px center",
+    paddingRight: 36,
   };
 
   return (
     <div style={{
       minHeight: "100vh",
-      background: "linear-gradient(150deg,#060e1f 0%,#0f1e3d 45%,#091428 100%)",
-      padding: isMobile ? "16px 12px 56px" : "28px 20px 48px",
-      fontFamily: "'Hiragino Kaku Gothic ProN','Noto Sans JP','Yu Gothic',sans-serif",
+      background: C.bg,
+      padding: isMobile ? "24px 16px 64px" : "40px 24px 56px",
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Hiragino Sans', sans-serif",
     }}>
 
-      {/* ── ヘッダー ── */}
-      <div style={{ textAlign: "center", marginBottom: isMobile ? 20 : 28 }}>
+      {/* ヘッダー */}
+      <div style={{ textAlign: "center", marginBottom: isMobile ? 28 : 36 }}>
         <div style={{
-          display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 10,
-          padding: "4px 14px", borderRadius: 20,
-          background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.25)",
-          color: "#93c5fd", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
+          display: "inline-block",
+          fontSize: 11, fontWeight: 600,
+          color: C.blue,
+          letterSpacing: "0.1em", textTransform: "uppercase",
+          marginBottom: 10,
         }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#60a5fa", display: "inline-block", boxShadow: "0 0 6px #60a5fa" }} />
-          HR TOOL ／ 借り上げ社宅制度
+          HR Tool — 借り上げ社宅制度
         </div>
-        <h1 style={{ color: "#f1f5f9", fontSize: isMobile ? 20 : 24, fontWeight: 900, margin: "0 0 6px", lineHeight: 1.3 }}>
+        <h1 style={{
+          color: C.labelPrimary,
+          fontSize: isMobile ? 22 : 28,
+          fontWeight: 700,
+          margin: "0 0 8px",
+          lineHeight: 1.2,
+          letterSpacing: "-0.02em",
+        }}>
           オファー比較シミュレーター
         </h1>
-        <p style={{ color: "#475569", fontSize: 11, margin: "0 0 16px" }}>
-          協会けんぽ 全47都道府県対応　／　社宅自己負担20%固定　／　賞与考慮あり
+        <p style={{
+          color: C.labelSecond,
+          fontSize: 13, margin: "0 0 20px",
+          fontWeight: 400,
+        }}>
+          協会けんぽ 全47都道府県対応　·　賞与考慮あり
         </p>
 
-        {/* モード切替 */}
+        {/* セグメントコントロール */}
         <div style={{
-          display: "inline-flex", borderRadius: 10, overflow: "hidden",
-          border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)",
+          display: "inline-flex",
+          padding: 3,
+          borderRadius: 10,
+          background: "rgba(118,118,128,0.24)",
+          gap: 2,
         }}>
-          {[["candidate", "👤 候補者モード"], ["hr", "⚙️ HR設定モード"]].map(([m, label]) => (
+          {[["candidate", "候補者モード"], ["hr", "HR 設定モード"]].map(([m, label]) => (
             <button key={m} onClick={() => setMode(m)} style={{
-              padding: isMobile ? "9px 14px" : "8px 20px", border: "none", cursor: "pointer",
-              fontFamily: "inherit", fontSize: 12, fontWeight: mode === m ? 800 : 400,
-              background: mode === m ? "rgba(255,255,255,0.16)" : "transparent",
-              color: mode === m ? "#f1f5f9" : "#64748b", transition: "all 0.2s",
+              padding: isMobile ? "8px 16px" : "7px 20px",
+              border: "none", borderRadius: 8, cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: 13, fontWeight: mode === m ? 600 : 400,
+              background: mode === m ? C.surface : "transparent",
+              color: mode === m ? C.labelPrimary : C.labelSecond,
+              boxShadow: mode === m ? "0 1px 4px rgba(0,0,0,0.3)" : "none",
+              transition: "all 0.15s",
+              letterSpacing: "-0.01em",
             }}>{label}</button>
           ))}
         </div>
       </div>
 
-      {/* ── HR設定モード パネル ── */}
+      {/* HR 設定パネル */}
       {mode === "hr" && (
         <div style={{
-          maxWidth: 680, margin: "0 auto 20px", borderRadius: 14, overflow: "hidden",
-          border: "1px solid rgba(251,191,36,0.3)", background: "rgba(251,191,36,0.05)",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+          maxWidth: 680, margin: "0 auto 20px",
+          borderRadius: 16,
+          background: C.surface,
+          border: `1px solid ${C.blue}44`,
+          overflow: "hidden",
         }}>
-          <div style={{ background: "linear-gradient(90deg,#78350f,#92400e)", padding: "12px 18px" }}>
-            <div style={{ color: "#fde68a", fontSize: 13, fontWeight: 800 }}>⚙️ HR設定モード</div>
-            <div style={{ color: "rgba(253,230,138,0.7)", fontSize: 11, marginTop: 2 }}>
-              候補者の情報を入力し、共有URLを生成して送付してください
+          <div style={{
+            padding: "14px 20px",
+            borderBottom: `1px solid ${C.separator}`,
+            display: "flex", alignItems: "center", gap: 10,
+          }}>
+            <div style={{
+              width: 6, height: 6, borderRadius: "50%",
+              background: C.blue,
+            }} />
+            <div style={{ color: C.labelPrimary, fontSize: 14, fontWeight: 600 }}>HR 設定モード</div>
+            <div style={{ color: C.labelSecond, fontSize: 12, marginLeft: 4 }}>
+              候補者の情報を入力し、共有 URL を生成して送付してください
             </div>
           </div>
-          <div style={{ padding: "14px 18px" }}>
+          <div style={{ padding: "16px 20px" }}>
             {/* 社宅会社負担割合 */}
-            <div style={{
-              marginBottom: 16, padding: "14px 16px",
-              background: "rgba(255,255,255,0.06)", borderRadius: 10,
-              border: "1px solid rgba(251,191,36,0.2)",
-            }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#fde68a", marginBottom: 10, letterSpacing: "0.05em" }}>
-                🏠 社宅会社負担割合
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: C.labelSecond, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 10 }}>
+                社宅会社負担割合
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {[50, 60, 70, 75, 80, 85, 90, 100].map(r => (
                   <button key={r} onClick={() => { setCoRatio(r); resetRan(); }} style={{
-                    padding: "8px 12px", borderRadius: 7, border: "1.5px solid", cursor: "pointer",
-                    borderColor: coRatio === r ? "#f59e0b" : "rgba(255,255,255,0.15)",
-                    background: coRatio === r ? "#f59e0b" : "rgba(255,255,255,0.05)",
-                    color: coRatio === r ? "#fff" : "#d97706",
-                    fontWeight: coRatio === r ? 800 : 500, fontFamily: "inherit", fontSize: 13,
-                    transition: "all 0.15s",
+                    padding: "8px 14px", borderRadius: 8,
+                    border: `1px solid ${coRatio === r ? C.blue : C.separator}`,
+                    background: coRatio === r ? C.blue : "transparent",
+                    color: coRatio === r ? "#fff" : C.labelSecond,
+                    fontWeight: coRatio === r ? 600 : 400,
+                    fontFamily: "inherit", fontSize: 13,
+                    cursor: "pointer", transition: "all 0.15s",
                   }}>
                     {r}%
                   </button>
                 ))}
               </div>
-              <div style={{ marginTop: 8, fontSize: 11, color: "rgba(253,230,138,0.7)" }}>
-                現在：会社 <strong style={{ color: "#fde68a" }}>{coRatio}%</strong> ／ 本人 <strong style={{ color: "#fde68a" }}>{100 - coRatio}%</strong>
+              <div style={{ marginTop: 10, fontSize: 12, color: C.labelSecond }}>
+                会社負担 <span style={{ color: C.labelPrimary, fontWeight: 600 }}>{coRatio}%</span>
+                　/　本人負担 <span style={{ color: C.labelPrimary, fontWeight: 600 }}>{100 - coRatio}%</span>
               </div>
             </div>
-            <div style={{ fontSize: 12, color: "#d97706", fontWeight: 600, marginBottom: 12, lineHeight: 1.8 }}>
-              ① 社宅会社負担割合・都道府県・年収・家賃・賞与・年齢・扶養を入力<br />
-              ② 「シミュレーションを実行」を押す<br />
-              ③ 「共有URLをコピー」して候補者にメール・Slackで送付
+
+            {/* 手順 */}
+            <div style={{
+              fontSize: 12, color: C.labelSecond,
+              lineHeight: 1.9, marginBottom: 14,
+            }}>
+              1. 社宅会社負担割合・都道府県・年収・家賃・賞与・年齢・扶養を入力<br />
+              2. シミュレーションを実行<br />
+              3. 共有 URL をコピーして候補者に送付
             </div>
+
             {result ? (
               <button onClick={handleCopyURL} style={{
-                width: "100%", padding: isMobile ? "14px" : "12px", borderRadius: 9,
-                background: copied === "url" ? "#065f46" : "linear-gradient(90deg,#b45309,#d97706)",
-                color: "#fff", fontWeight: 800, fontSize: isMobile ? 15 : 13,
-                border: "none", cursor: "pointer", fontFamily: "inherit",
-                letterSpacing: "0.04em", boxShadow: "0 3px 14px rgba(217,119,6,0.35)",
-                transition: "background 0.3s",
+                width: "100%",
+                padding: isMobile ? "14px" : "12px",
+                borderRadius: 10,
+                background: copied === "url" ? C.green : C.blue,
+                color: "#fff", fontWeight: 600,
+                fontSize: isMobile ? 15 : 13,
+                border: "none", cursor: "pointer",
+                fontFamily: "inherit",
+                transition: "background 0.25s",
+                letterSpacing: "-0.01em",
               }}>
-                {copied === "url" ? "✓ URLをコピーしました！" : "🔗 候補者への共有URLをコピー"}
+                {copied === "url" ? "URL をコピーしました" : "候補者への共有 URL をコピー"}
               </button>
             ) : (
               <div style={{
-                padding: "10px 14px", background: "rgba(255,255,255,0.05)",
-                borderRadius: 8, color: "#94a3b8", fontSize: 12, textAlign: "center",
+                padding: "11px 16px",
+                background: C.surface2,
+                borderRadius: 10,
+                color: C.gray,
+                fontSize: 12, textAlign: "center",
               }}>
                 先にシミュレーションを実行してください
               </div>
@@ -771,46 +962,56 @@ export default function App() {
         </div>
       )}
 
-      {/* ── 入力フォーム ── */}
+      {/* 入力フォーム */}
       <div style={{
-        maxWidth: 680, margin: "0 auto 20px", background: "#fff", borderRadius: 16,
-        padding: isMobile ? "18px 14px" : "24px 28px",
-        boxShadow: "0 16px 56px rgba(0,0,0,0.45)",
+        maxWidth: 680, margin: "0 auto 20px",
+        background: C.formBg,
+        borderRadius: 16,
+        padding: isMobile ? "20px 16px" : "28px 32px",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
       }}>
-        <div style={{ fontSize: 12, fontWeight: 800, color: "#1e293b", marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ background: "#1d4ed8", color: "#fff", borderRadius: 5, padding: "2px 8px", fontSize: 9, letterSpacing: "0.06em" }}>STEP 1</span>
+        <div style={{
+          fontSize: 13, fontWeight: 600,
+          color: C.formLabel, marginBottom: 22,
+          display: "flex", alignItems: "center", gap: 10,
+        }}>
+          <span style={{
+            background: C.blue, color: "#fff",
+            borderRadius: 6, padding: "3px 9px",
+            fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
+          }}>STEP 1</span>
           候補者の情報を入力してください
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 14 : "16px 24px" }}>
-
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+          gap: isMobile ? 18 : "18px 28px",
+        }}>
           {/* 都道府県 */}
           <div>
-            <label style={lbl}>居住都道府県（健保料率に影響）</label>
-            <div style={{ position: "relative" }}>
-              <select value={pref} onChange={e => { setPref(e.target.value); resetRan(); }} style={selectStyle}>
-                {PREFS.map(p => (
-                  <option key={p} value={p}>{p}　（{KENPO_RATES[p]}%）</option>
-                ))}
-              </select>
-            </div>
+            <label style={lbl}>居住都道府県</label>
+            <select value={pref} onChange={e => { setPref(e.target.value); resetRan(); }} style={selectStyle}>
+              {PREFS.map(p => (
+                <option key={p} value={p}>{p}　（{KENPO_RATES[p]}%）</option>
+              ))}
+            </select>
           </div>
 
           {/* 賞与月数 */}
           <div>
-            <label style={lbl}>賞与月数（月）</label>
-            <div style={{ display: "flex", gap: 6 }}>
+            <label style={lbl}>賞与月数</label>
+            <div style={{
+              display: "flex", gap: 4,
+              background: "rgba(118,118,128,0.18)",
+              borderRadius: 10, padding: 3,
+            }}>
               {[0, 1, 2, 3, 4, 5, 6].map(n => (
-                <button key={n} onClick={() => { setBonus(n); resetRan(); }} style={{
-                  flex: 1, padding: isMobile ? "11px 0" : "8px 0", borderRadius: 7,
-                  fontSize: isMobile ? 14 : 12, border: "1.5px solid", cursor: "pointer",
-                  borderColor: bonus === n ? "#3b82f6" : "#e2e8f0",
-                  background: bonus === n ? "#eff6ff" : "#f8fafc",
-                  color: bonus === n ? "#1d4ed8" : "#64748b",
-                  fontWeight: bonus === n ? 800 : 400, fontFamily: "inherit",
-                }}>
+                <SegBtn key={n} active={bonus === n}
+                  onClick={() => { setBonus(n); resetRan(); }}
+                  isMobile={isMobile}>
                   {n}
-                </button>
+                </SegBtn>
               ))}
             </div>
           </div>
@@ -820,8 +1021,8 @@ export default function App() {
             <label style={lbl}>提示年収（万円）</label>
             <NumInput val={nenshu} setter={setNenshu} min={100} max={3000} step={10} onDone={resetRan} isMobile={isMobile} />
             {bonus > 0 && (
-              <div style={{ marginTop: 5, fontSize: 10, color: "#64748b" }}>
-                月給 約{Math.round(nenshu / (12 + bonus))}万 ＋ 賞与 約{Math.round(nenshu * bonus / (12 + bonus))}万/年
+              <div style={{ marginTop: 6, fontSize: 11, color: C.gray }}>
+                月給 約{Math.round(nenshu / (12 + bonus))}万　+　賞与 約{Math.round(nenshu * bonus / (12 + bonus))}万/年
               </div>
             )}
           </div>
@@ -837,8 +1038,8 @@ export default function App() {
             <label style={lbl}>年齢</label>
             <NumInput val={age} setter={setAge} min={18} max={70} step={1} onDone={resetRan} isMobile={isMobile} />
             {age >= 40 && (
-              <div style={{ marginTop: 5, fontSize: 11, color: "#f59e0b", fontWeight: 600 }}>
-                ⚠ 40歳以上：介護保険料が加算されます
+              <div style={{ marginTop: 6, fontSize: 11, color: C.orange, fontWeight: 500 }}>
+                40歳以上：介護保険料が加算されます
               </div>
             )}
           </div>
@@ -846,27 +1047,29 @@ export default function App() {
           {/* 扶養 */}
           <div>
             <label style={lbl}>扶養家族の人数</label>
-            <div style={{ display: "flex", gap: 6 }}>
+            <div style={{
+              display: "flex", gap: 4,
+              background: "rgba(118,118,128,0.18)",
+              borderRadius: 10, padding: 3,
+            }}>
               {[0, 1, 2, 3].map(n => (
-                <button key={n} onClick={() => { setDep(n); resetRan(); }} style={{
-                  flex: 1, padding: isMobile ? "11px 0" : "8px 0", borderRadius: 8,
-                  fontSize: isMobile ? 14 : 13, border: "1.5px solid", cursor: "pointer",
-                  borderColor: dep === n ? "#3b82f6" : "#e2e8f0",
-                  background: dep === n ? "#eff6ff" : "#f8fafc",
-                  color: dep === n ? "#1d4ed8" : "#64748b",
-                  fontWeight: dep === n ? 800 : 400, fontFamily: "inherit",
-                }}>
-                  {n === 3 ? "3+" : n}人
-                </button>
+                <SegBtn key={n} active={dep === n}
+                  onClick={() => { setDep(n); resetRan(); }}
+                  isMobile={isMobile}>
+                  {n === 3 ? "3+" : `${n}人`}
+                </SegBtn>
               ))}
             </div>
           </div>
         </div>
 
-        {/* 固定条件 */}
+        {/* 計算条件メモ */}
         <div style={{
-          marginTop: 16, padding: "10px 14px", background: "#f8fafc",
-          borderRadius: 8, border: "1px solid #e9eef4", display: "flex", gap: "6px 16px", flexWrap: "wrap",
+          marginTop: 20,
+          padding: "10px 14px",
+          background: C.formSurface,
+          borderRadius: 10,
+          display: "flex", gap: "6px 20px", flexWrap: "wrap",
         }}>
           {[
             ["健康保険", `協会けんぽ ${pref}（${KENPO_RATES[pref]}%）`],
@@ -874,155 +1077,235 @@ export default function App() {
             ["厚生年金", "18.30%（折半）"],
             ["雇用保険", "0.60%（本人）"],
           ].map(([k, v]) => (
-            <span key={k} style={{ fontSize: 10, color: "#64748b" }}>
-              <span style={{ color: "#94a3b8" }}>{k}：</span>{v}
+            <span key={k} style={{ fontSize: 11, color: C.formSecond }}>
+              <span style={{ color: C.gray }}>{k}: </span>{v}
             </span>
           ))}
         </div>
 
         <button onClick={() => setRan(true)} style={{
-          marginTop: 18, width: "100%", padding: isMobile ? "16px" : "13px",
-          background: "linear-gradient(90deg,#1e3a8a,#1e40af,#2563eb)",
-          color: "#fff", fontWeight: 800, fontSize: isMobile ? 16 : 14, borderRadius: 10,
-          border: "none", cursor: "pointer", letterSpacing: "0.06em", fontFamily: "inherit",
-          boxShadow: "0 4px 20px rgba(37,99,235,0.45)",
-          WebkitTapHighlightColor: "transparent",
-          transition: "opacity 0.2s",
+          marginTop: 18, width: "100%",
+          padding: isMobile ? "16px" : "14px",
+          background: C.blue,
+          color: "#fff", fontWeight: 600,
+          fontSize: isMobile ? 16 : 15,
+          borderRadius: 12, border: "none",
+          cursor: "pointer",
+          letterSpacing: "-0.01em",
+          fontFamily: "inherit",
+          transition: "opacity 0.15s",
         }}>
-          ▶ シミュレーションを実行
+          シミュレーションを実行
         </button>
       </div>
 
-      {/* ── 結果エリア ── */}
+      {/* 結果エリア */}
       {result && (
         <div style={{ maxWidth: 680, margin: "0 auto" }}>
 
           {/* 差額バナー */}
           <div style={{
-            borderRadius: 14, padding: isMobile ? "18px 16px" : "18px 24px",
-            background: diff > 0
-              ? "linear-gradient(90deg,#064e3b,#065f46,#047857)"
-              : "linear-gradient(90deg,#7f1d1d,#991b1b)",
-            boxShadow: diff > 0
-              ? "0 4px 24px rgba(4,120,87,0.4)"
-              : "0 4px 24px rgba(153,27,27,0.4)",
-            marginBottom: 16,
+            borderRadius: 16,
+            padding: isMobile ? "20px 18px" : "22px 28px",
+            background: C.surface,
+            border: `1px solid ${diff > 0 ? C.green + "44" : C.red + "44"}`,
+            marginBottom: 12,
           }}>
-            <div style={{ fontSize: 11, color: diff > 0 ? "#6ee7b7" : "#fca5a5", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 6 }}>
-              社宅制度を利用すると年間手取りが
+            <div style={{
+              fontSize: 11, fontWeight: 600,
+              color: diff > 0 ? C.green : C.red,
+              letterSpacing: "0.06em", textTransform: "uppercase",
+              marginBottom: 8,
+            }}>
+              社宅制度による年間手取り変化
             </div>
             <div style={{
               display: "flex", justifyContent: "space-between",
               alignItems: isMobile ? "flex-start" : "center",
-              flexDirection: isMobile ? "column" : "row", gap: isMobile ? 12 : 0,
+              flexDirection: isMobile ? "column" : "row",
+              gap: isMobile ? 14 : 0,
             }}>
               <div>
-                <div style={{ color: "#fff", fontSize: isMobile ? 28 : 26, fontWeight: 900, lineHeight: 1 }}>
+                <div style={{
+                  color: diff > 0 ? C.green : C.red,
+                  fontSize: isMobile ? 32 : 30,
+                  fontWeight: 700, lineHeight: 1,
+                  letterSpacing: "-0.03em",
+                }}>
                   {diff > 0 ? "+" : "−"}{yen2(Math.abs(diff))}
-                  <span style={{ fontSize: 11, color: diff > 0 ? "#6ee7b7" : "#fca5a5", marginLeft: 8, fontWeight: 500 }}>概算</span>
                 </div>
-                <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 11, marginTop: 4 }}>
-                  月換算 {diff > 0 ? "+" : "−"}{yen(Math.abs(diff / 12))}
+                <div style={{ color: C.labelSecond, fontSize: 12, marginTop: 5 }}>
+                  月換算 {diff > 0 ? "+" : "−"}{yen(Math.abs(diff / 12))}　概算
                 </div>
               </div>
               <div style={{ textAlign: isMobile ? "left" : "right" }}>
-                <div style={{ color: diff > 0 ? "#6ee7b7" : "#fca5a5", fontSize: 10, fontWeight: 700 }}>会社年間コスト比較</div>
-                <div style={{ color: "rgba(255,255,255,0.65)", fontSize: 12, marginTop: 3 }}>社宅なし {yen2(result.no.companyTotal * 12)}</div>
-                <div style={{ color: "#fff", fontSize: 12, fontWeight: 700 }}>社宅あり {yen2(result.yes.companyTotal * 12)}</div>
+                <div style={{ color: C.labelThird, fontSize: 11, fontWeight: 500, marginBottom: 4 }}>会社年間コスト</div>
+                <div style={{ color: C.labelSecond, fontSize: 13 }}>
+                  社宅なし　{yen2(result.no.companyTotal * 12)}
+                </div>
+                <div style={{ color: C.labelPrimary, fontSize: 13, fontWeight: 600 }}>
+                  社宅あり　{yen2(result.yes.companyTotal * 12)}
+                </div>
               </div>
             </div>
           </div>
 
           {/* 理論年収・年間負担内訳 */}
-          <CostSummaryTable no={result.no} yes={result.yes} nenshu={nenshu} coRatio={coRatio} isMobile={isMobile} />
+          <CostSummaryTable
+            no={result.no} yes={result.yes}
+            nenshu={nenshu} coRatio={coRatio}
+            isMobile={isMobile}
+          />
 
           {/* グラフ */}
           <CompareChart no={result.no} yes={result.yes} isMobile={isMobile} />
 
           {/* 2カード */}
-          <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 12, marginBottom: 16 }}>
+          <div style={{
+            display: "flex",
+            flexDirection: isMobile ? "column" : "row",
+            gap: 12, marginBottom: 14,
+          }}>
             <PatternCard
               title="社宅なし"
-              subtitle={`月給 ${yen2(result.no.monthly)}　家賃全額自己負担`}
-              accent="#475569" data={result.no} isMobile={isMobile}
+              data={result.no}
+              coRatio={coRatio}
+              isMobile={isMobile}
             />
             <PatternCard
-              title="✦ 社宅あり（推奨）"
-              subtitle={`月給 ${yen2(result.yes.monthly)}　家賃の${coRatio}%を会社負担`}
-              accent="#1d4ed8" data={result.yes} badge isMobile={isMobile}
+              title="社宅あり"
+              isRecommended
+              data={result.yes}
+              coRatio={coRatio}
+              isMobile={isMobile}
             />
           </div>
 
           {/* アクションボタン */}
-          <div style={{ display: "flex", gap: 10, flexDirection: isMobile ? "column" : "row", marginBottom: 12 }}>
+          <div style={{
+            display: "flex", gap: 10,
+            flexDirection: isMobile ? "column" : "row",
+            marginBottom: 14,
+          }}>
             <button onClick={handleCopyResult} style={{
-              flex: 1, padding: isMobile ? "14px" : "12px", borderRadius: 10,
-              background: copied === "text" ? "#065f46" : "#fff",
-              color: copied === "text" ? "#fff" : "#1e293b",
-              fontWeight: 700, fontSize: isMobile ? 14 : 13,
-              border: "1.5px solid", borderColor: copied === "text" ? "#065f46" : "#e2e8f0",
-              cursor: "pointer", fontFamily: "inherit", transition: "all 0.3s",
-              boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+              flex: 1,
+              padding: isMobile ? "14px" : "12px",
+              borderRadius: 10,
+              background: copied === "text" ? C.green : C.surface,
+              color: copied === "text" ? "#fff" : C.labelPrimary,
+              fontWeight: 500, fontSize: isMobile ? 14 : 13,
+              border: `1px solid ${copied === "text" ? C.green : C.separator}`,
+              cursor: "pointer", fontFamily: "inherit",
+              transition: "all 0.25s",
+              letterSpacing: "-0.01em",
             }}>
-              {copied === "text" ? "✓ コピーしました！" : "📋 結果テキストをコピー"}
+              {copied === "text" ? "コピーしました" : "結果テキストをコピー"}
             </button>
             {mode === "hr" && (
               <button onClick={handleCopyURL} style={{
-                flex: 1, padding: isMobile ? "14px" : "12px", borderRadius: 10,
-                background: copied === "url" ? "#065f46" : "linear-gradient(90deg,#b45309,#d97706)",
-                color: "#fff", fontWeight: 700, fontSize: isMobile ? 14 : 13,
-                border: "none", cursor: "pointer", fontFamily: "inherit",
-                transition: "background 0.3s", boxShadow: "0 3px 14px rgba(217,119,6,0.35)",
+                flex: 1,
+                padding: isMobile ? "14px" : "12px",
+                borderRadius: 10,
+                background: copied === "url" ? C.green : C.blue,
+                color: "#fff", fontWeight: 500,
+                fontSize: isMobile ? 14 : 13,
+                border: "none", cursor: "pointer",
+                fontFamily: "inherit",
+                transition: "background 0.25s",
+                letterSpacing: "-0.01em",
               }}>
-                {copied === "url" ? "✓ URLコピー完了！" : "🔗 共有URLをコピー"}
+                {copied === "url" ? "URL をコピーしました" : "共有 URL をコピー"}
               </button>
             )}
             <button onClick={handlePrint} style={{
-              flex: isMobile ? "none" : "0 0 auto", padding: isMobile ? "14px" : "12px 18px",
-              borderRadius: 10, background: "rgba(255,255,255,0.08)",
-              color: "#94a3b8", fontWeight: 700, fontSize: isMobile ? 14 : 13,
-              border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer", fontFamily: "inherit",
-              transition: "all 0.2s",
+              flex: isMobile ? "none" : "0 0 auto",
+              padding: isMobile ? "14px" : "12px 20px",
+              borderRadius: 10,
+              background: "transparent",
+              color: C.gray, fontWeight: 500,
+              fontSize: isMobile ? 14 : 13,
+              border: `1px solid ${C.separator}`,
+              cursor: "pointer", fontFamily: "inherit",
+              letterSpacing: "-0.01em",
             }}>
-              🖨️ 印刷
+              印刷
             </button>
           </div>
 
           {/* 凡例 */}
-          <div style={{ display: "flex", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 10, color: "#475569" }}><Badge approx={false} /> 法令計算による確定値</span>
-            <span style={{ fontSize: 10, color: "#475569" }}><Badge approx={true} /> 住民税は前年所得ベースのため概算</span>
+          <div style={{
+            display: "flex", justifyContent: "center",
+            gap: 20, flexWrap: "wrap",
+          }}>
+            <span style={{ fontSize: 11, color: C.gray }}>
+              <Badge approx={false} /> 法令計算による確定値
+            </span>
+            <span style={{ fontSize: 11, color: C.gray }}>
+              <Badge approx={true} /> 住民税は前年所得ベースのため概算
+            </span>
           </div>
         </div>
       )}
 
-      {/* ── FAQ ── */}
-      <div style={{ maxWidth: 680, margin: "40px auto 0" }}>
-        <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 28 }}>
-          <div style={{ color: "#334155", fontSize: 11, fontWeight: 700, marginBottom: 14, letterSpacing: "0.06em" }}>よくある質問</div>
+      {/* FAQ */}
+      <div style={{ maxWidth: 680, margin: "48px auto 0" }}>
+        <div style={{
+          borderTop: `1px solid ${C.separator}`,
+          paddingTop: 32,
+        }}>
+          <div style={{
+            fontSize: 11, fontWeight: 600,
+            color: C.labelSecond,
+            letterSpacing: "0.08em", textTransform: "uppercase",
+            marginBottom: 16,
+          }}>よくある質問</div>
           {[
-            ["社宅制度で年収が下がるのに手取りが増えるのはなぜ？",
-              "社宅家賃の80%を会社負担にすることで、その分が「現物給与」として非課税扱いになります。結果、社会保険料・所得税・住民税の計算ベースが下がり、実質手取りが増加します。"],
-            ["賞与月数はどこに影響しますか？",
-              "賞与がある場合、月収が変わり標準報酬月額が変わります。また賞与にも社会保険料が別途かかります（健保・厚生年金・雇用保険）。このツールでは賞与時の社保控除も考慮しています。"],
-            ["どのくらい正確ですか？",
-              "所得税・厚生年金・雇用保険は確定値に近い計算です。住民税は概算です（前年所得ベース・均等割含む）。実際の金額は年末調整・確定申告・各種控除によって変わります。"],
+            [
+              "社宅制度で年収が下がるのに手取りが増えるのはなぜ？",
+              "社宅家賃の一部を会社負担にすることで、その分が社会保険料・所得税・住民税の計算ベースから外れます。結果、各種控除額が下がり実質手取りが増加します。",
+            ],
+            [
+              "賞与月数はどこに影響しますか？",
+              "賞与がある場合、月収が変わり標準報酬月額が変わります。また賞与にも社会保険料が別途かかります（健保・厚生年金・雇用保険）。このツールでは賞与時の社保控除も考慮しています。",
+            ],
+            [
+              "どのくらい正確ですか？",
+              "所得税・厚生年金・雇用保険は確定値に近い計算です。住民税は概算です（前年所得ベース・均等割含む）。実際の金額は年末調整・確定申告・各種控除によって変わります。",
+            ],
           ].map(([q, a]) => (
-            <div key={q} style={{ marginBottom: 14, padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.05)" }}>
-              <div style={{ color: "#93c5fd", fontSize: 12, fontWeight: 700, marginBottom: 5 }}>Q. {q}</div>
-              <div style={{ color: "#64748b", fontSize: 11, lineHeight: 1.7 }}>{a}</div>
+            <div key={q} style={{
+              marginBottom: 12,
+              padding: "14px 18px",
+              background: C.surface,
+              borderRadius: 12,
+              border: `1px solid ${C.separator}`,
+            }}>
+              <div style={{
+                color: C.labelPrimary,
+                fontSize: 13, fontWeight: 600, marginBottom: 6,
+              }}>
+                {q}
+              </div>
+              <div style={{
+                color: C.labelSecond,
+                fontSize: 12, lineHeight: 1.7,
+              }}>
+                {a}
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ── フッター ── */}
-      <div style={{ textAlign: "center", marginTop: 28, color: "#334155", fontSize: 10, lineHeight: 1.8 }}>
-        <div>※ 本ツールは概算シミュレーション用です。実際の金額は状況により異なります。</div>
-        <div>※ 協会けんぽ2024年度料率を使用。厚生年金18.30%・雇用保険0.60%（被保険者）。</div>
+      {/* フッター */}
+      <div style={{
+        textAlign: "center", marginTop: 32,
+        color: C.gray, fontSize: 11, lineHeight: 1.8,
+      }}>
+        <div>本ツールは概算シミュレーション用です。実際の金額は状況により異なります。</div>
+        <div>協会けんぽ 2024 年度料率を使用。厚生年金 18.30% · 雇用保険 0.60%（被保険者）。</div>
       </div>
 
-      {/* 印刷用スタイル */}
       <style>{`
         @media print {
           body { background: #fff !important; }
