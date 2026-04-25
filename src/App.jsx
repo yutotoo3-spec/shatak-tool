@@ -61,9 +61,10 @@ const calcJumin = (nenshu, shakai, dep) => {
   return Math.floor(Math.max(0, s - shakai - 430000 - 330000 * dep) * 0.1 + 5500);
 };
 
-const calcPattern = (nenshu, yachin, age, dep, withShatak, kenpoRate, bonusMonths) => {
+const calcPattern = (nenshu, yachin, age, dep, withShatak, kenpoRate, bonusMonths, coRatio) => {
+  const coR = coRatio / 100; // 会社負担割合（例：80 → 0.80）
   // 社宅あり：給与年収から社宅会社負担分を差し引いた額が提示年収
-  const teiji = withShatak ? nenshu - yachin * 0.8 * 12 : nenshu;
+  const teiji = withShatak ? nenshu - yachin * coR * 12 : nenshu;
 
   // 月収・賞与の分離（提示年収 ÷ (12 + 賞与月数) = 月収）
   const monthly = teiji / (12 + bonusMonths);
@@ -92,7 +93,7 @@ const calcPattern = (nenshu, yachin, age, dep, withShatak, kenpoRate, bonusMonth
   const annual_shotoku = calcShotoku(kazei);
   const annual_jumin   = calcJumin(teiji, annual_shakai, dep);
 
-  const selfYachin    = withShatak ? Math.round(yachin * 0.2) : yachin;
+  const selfYachin    = withShatak ? Math.round(yachin * (1 - coR)) : yachin;
   const annual_yachin = selfYachin * 12;
 
   const annual_tedori = teiji - annual_shakai - annual_shotoku - annual_jumin - annual_yachin;
@@ -106,7 +107,7 @@ const calcPattern = (nenshu, yachin, age, dep, withShatak, kenpoRate, bonusMonth
   // 会社負担
   const co_shakai = Math.round(h * kenpoRate) + (age >= 40 ? Math.round(h * 0.0080) : 0)
     + Math.round(h * 0.0915) + Math.round(monthly * 0.0085);
-  const co_yachin = withShatak ? Math.round(yachin * 0.8) : 0;
+  const co_yachin = withShatak ? Math.round(yachin * coR) : 0;
 
   return {
     teiji, monthly, annualBonus, h,
@@ -226,10 +227,10 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 // ── 理論年収・年間負担内訳テーブル
-const CostSummaryTable = ({ no, yes, isMobile }) => {
-  // 理論年収 = 給与のみ（借上社宅の会社負担分は含まない）
-  // 社宅なし: teiji = 提示年収そのまま
-  // 社宅あり: teiji = 提示年収 − 社宅会社負担分（80%×12ヶ月）
+const CostSummaryTable = ({ no, yes, nenshu, coRatio, isMobile }) => {
+  // 理論年収（提示年収）= 借上社宅の会社負担分を含まない純粋な給与オファー額
+  // 社宅なし・社宅あり 両方とも同値（借上社宅は理論年収に含まない）
+  const totalNenshu = nenshu * 10000;
 
   const noPersonal  = no.annual_yachin + no.annual_shakai + no.annual_shotoku + no.annual_jumin;
   const yesPersonal = yes.annual_yachin + yes.annual_shakai + yes.annual_shotoku + yes.annual_jumin;
@@ -297,9 +298,9 @@ const CostSummaryTable = ({ no, yes, isMobile }) => {
           <tbody>
             {/* 理論年収 */}
             <tr>
-              <TD bold>理論年収（給与ベース）</TD>
-              <TD bold right highlight="blue">{yen2(no.teiji)}</TD>
-              <TD bold right highlight="blue">{yen2(yes.teiji)}</TD>
+              <TD bold>理論年収（提示年収）</TD>
+              <TD bold right highlight="blue">{yen2(totalNenshu)}</TD>
+              <TD bold right highlight="blue">{yen2(totalNenshu)}</TD>
             </tr>
 
             {/* 企業支払い */}
@@ -359,7 +360,7 @@ const CostSummaryTable = ({ no, yes, isMobile }) => {
         </table>
       </div>
       <div style={{ padding: "8px 16px 12px", fontSize: 10, color: "#94a3b8", lineHeight: 1.6 }}>
-        ※ 理論年収＝給与のみ（借上社宅の会社負担分は含まない）。社宅ありは提示年収から社宅会社負担分を差し引いた額。住民税は概算。
+        ※ 理論年収（提示年収）は借上社宅の会社負担分を含まない純粋な給与額。社宅ありの場合も同額を基準とし、企業は給与を下げた分を社宅費として別途負担します。住民税は概算。
       </div>
     </div>
   );
@@ -505,6 +506,7 @@ export default function App() {
   const [dep,       setDep]       = useState(0);
   const [pref,      setPref]      = useState("京都");
   const [bonus,     setBonus]     = useState(2);
+  const [coRatio,   setCoRatio]   = useState(80); // 社宅会社負担割合（%）
   const [ran,       setRan]       = useState(false);
   const [mode,      setMode]      = useState("candidate");
   const [copied,    setCopied]    = useState("");
@@ -528,6 +530,7 @@ export default function App() {
       if (p.get("d")) setDep(+p.get("d"));
       if (p.get("p") && KENPO_RATES[p.get("p")]) setPref(p.get("p"));
       if (p.get("b") !== null && p.get("b") !== undefined) setBonus(+p.get("b"));
+      if (p.get("r")) setCoRatio(Math.min(100, Math.max(50, +p.get("r"))));
       setRan(true);
       setMode("candidate");
     } catch {}
@@ -539,17 +542,17 @@ export default function App() {
     if (!ran) return null;
     const n = nenshu * 10000, y = yachin * 10000;
     return {
-      no:  calcPattern(n, y, age, dep, false, kenpoRate, bonus),
-      yes: calcPattern(n, y, age, dep, true,  kenpoRate, bonus),
+      no:  calcPattern(n, y, age, dep, false, kenpoRate, bonus, coRatio),
+      yes: calcPattern(n, y, age, dep, true,  kenpoRate, bonus, coRatio),
     };
-  }, [ran, nenshu, yachin, age, dep, kenpoRate, bonus]);
+  }, [ran, nenshu, yachin, age, dep, kenpoRate, bonus, coRatio]);
 
   const diff = result ? result.yes.annual_tedori - result.no.annual_tedori : 0;
 
   const buildShareURL = useCallback(() => {
-    const params = new URLSearchParams({ n: nenshu, y: yachin, a: age, d: dep, p: pref, b: bonus });
+    const params = new URLSearchParams({ n: nenshu, y: yachin, a: age, d: dep, p: pref, b: bonus, r: coRatio });
     return `${window.location.href.split("#")[0]}#${params.toString()}`;
-  }, [nenshu, yachin, age, dep, pref, bonus]);
+  }, [nenshu, yachin, age, dep, pref, bonus, coRatio]);
 
   const handleCopyURL = useCallback(async () => {
     try {
@@ -563,25 +566,73 @@ export default function App() {
   const handleCopyResult = useCallback(async () => {
     if (!result) return;
     const { no, yes } = result;
+    const nenshuYen = nenshu * 10000; // 理論年収（提示年収）
+    const noPersonal  = no.annual_yachin + no.annual_shakai + no.annual_shotoku + no.annual_jumin;
+    const yesPersonal = yes.annual_yachin + yes.annual_shakai + yes.annual_shotoku + yes.annual_jumin;
     const text = [
-      "【借り上げ社宅制度 オファー比較シミュレーション】",
-      `都道府県：${pref}　賞与：${bonus}ヶ月　年齢：${age}歳　扶養：${dep}人`,
+      "═══════════════════════════════════════",
+      "  借り上げ社宅制度 オファー比較シミュレーション",
+      "═══════════════════════════════════════",
       "",
-      "■ 社宅なし",
-      `  月給（額面）: ${yen2(no.monthly)}　${bonus > 0 ? `賞与: ${yen2(no.annualBonus)}（年間）` : ""}`,
-      `  月間手取り（実質）: ${yen(no.m_tedori)}　※概算`,
-      `  年間手取り（実質）: ${yen2(no.annual_tedori)}　※概算`,
+      "【入力条件】",
+      `  理論年収（提示年収）: ${yen2(nenshuYen)}`,
+      `  想定家賃（月額）    : ${yen(yachin * 10000)}`,
+      `  社宅会社負担割合    : ${coRatio}%（本人負担 ${100 - coRatio}%）`,
+      `  都道府県            : ${pref}（協会けんぽ ${KENPO_RATES[pref]}%）`,
+      `  賞与                : ${bonus}ヶ月`,
+      `  年齢                : ${age}歳${age >= 40 ? "（介護保険あり）" : ""}`,
+      `  扶養家族            : ${dep}人`,
       "",
-      "■ 社宅あり（推奨）",
-      `  月給（額面）: ${yen2(yes.monthly)}　${bonus > 0 ? `賞与: ${yen2(yes.annualBonus)}（年間）` : ""}`,
-      `  社宅家賃うち自己負担: ${yen(yes.selfYachin)}/月`,
-      `  月間手取り（実質）: ${yen(yes.m_tedori)}　※概算`,
-      `  年間手取り（実質）: ${yen2(yes.annual_tedori)}　※概算`,
+      "───────────────────────────────────────",
+      "【社宅なし】",
+      "───────────────────────────────────────",
+      `  月給（額面）        : ${yen2(no.monthly)}${bonus > 0 ? `　賞与: ${yen2(no.annualBonus)}/年` : ""}`,
+      `  家賃自己負担        : ${yen(no.selfYachin)}/月（年間 ${yen2(no.annual_yachin)}）`,
       "",
-      `▶ 社宅を利用すると年間手取りが約 ${yen2(Math.abs(diff))} ${diff > 0 ? "増加" : "減少"}します（概算）`,
+      "  ▼ 企業支払い（年間）",
+      `    給与              : ${yen2(no.teiji)}`,
+      `    会社負担社保      : ${yen2(no.co_shakai * 12)}`,
+      `    社宅費用          : −（なし）`,
+      `    ＝ 企業合計       : ${yen2(no.companyTotal * 12)}`,
       "",
-      "※ 住民税は概算値です。実際の金額は確定申告・年末調整により異なります。",
-      `※ 協会けんぽ${pref}支部の料率にて計算しています。`,
+      "  ▼ 個人負担（年間）",
+      `    家賃              : ${yen2(no.annual_yachin)}`,
+      `    社保（本人）      : ${yen2(no.annual_shakai)}`,
+      `    税金（所得税+住民税）: ${yen2(no.annual_shotoku + no.annual_jumin)}`,
+      `    ＝ 個人負担合計   : ${yen2(noPersonal)}`,
+      "",
+      `  年間手取り（実質）  : ${yen2(no.annual_tedori)}　※概算`,
+      `  月間手取り（実質）  : ${yen(no.m_tedori)}　※家賃支払い後`,
+      "",
+      "───────────────────────────────────────",
+      `【社宅あり（会社${coRatio}%負担）】`,
+      "───────────────────────────────────────",
+      `  月給（額面）        : ${yen2(yes.monthly)}${bonus > 0 ? `　賞与: ${yen2(yes.annualBonus)}/年` : ""}`,
+      `  家賃自己負担        : ${yen(yes.selfYachin)}/月（年間 ${yen2(yes.annual_yachin)}）`,
+      `  社宅会社負担        : ${yen(yes.co_yachin)}/月（年間 ${yen2(yes.co_yachin * 12)}）`,
+      "",
+      "  ▼ 企業支払い（年間）",
+      `    給与              : ${yen2(yes.teiji)}`,
+      `    会社負担社保      : ${yen2(yes.co_shakai * 12)}`,
+      `    社宅費用          : ${yen2(yes.co_yachin * 12)}`,
+      `    ＝ 企業合計       : ${yen2(yes.companyTotal * 12)}`,
+      "",
+      "  ▼ 個人負担（年間）",
+      `    家賃（${100 - coRatio}%分）     : ${yen2(yes.annual_yachin)}`,
+      `    社保（本人）      : ${yen2(yes.annual_shakai)}`,
+      `    税金（所得税+住民税）: ${yen2(yes.annual_shotoku + yes.annual_jumin)}`,
+      `    ＝ 個人負担合計   : ${yen2(yesPersonal)}`,
+      "",
+      `  年間手取り（実質）  : ${yen2(yes.annual_tedori)}　※概算`,
+      `  月間手取り（実質）  : ${yen(yes.m_tedori)}　※家賃支払い後`,
+      "",
+      "═══════════════════════════════════════",
+      `▶ 社宅制度により年間手取りが ${diff > 0 ? "+" : ""}${yen2(diff)}（月間 ${diff > 0 ? "+" : ""}${yen(diff / 12)}）`,
+      "═══════════════════════════════════════",
+      "",
+      "※ 住民税は概算値です（前年所得ベース）。",
+      `※ 協会けんぽ${pref}支部の料率を使用。厚生年金18.30%・雇用保険0.60%。`,
+      "※ 実際の金額は年末調整・確定申告・各種控除により異なります。",
     ].join("\n");
     try {
       await navigator.clipboard.writeText(text);
@@ -589,7 +640,7 @@ export default function App() {
     } catch {
       alert("コピーに失敗しました。");
     }
-  }, [result, diff, pref, bonus, age, dep]);
+  }, [result, diff, pref, bonus, age, dep, nenshu, yachin, coRatio]);
 
   const handlePrint = () => window.print();
   const resetRan = () => setRan(false);
@@ -665,8 +716,35 @@ export default function App() {
             </div>
           </div>
           <div style={{ padding: "14px 18px" }}>
+            {/* 社宅会社負担割合 */}
+            <div style={{
+              marginBottom: 16, padding: "14px 16px",
+              background: "rgba(255,255,255,0.06)", borderRadius: 10,
+              border: "1px solid rgba(251,191,36,0.2)",
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#fde68a", marginBottom: 10, letterSpacing: "0.05em" }}>
+                🏠 社宅会社負担割合
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {[50, 60, 70, 75, 80, 85, 90, 100].map(r => (
+                  <button key={r} onClick={() => { setCoRatio(r); resetRan(); }} style={{
+                    padding: "8px 12px", borderRadius: 7, border: "1.5px solid", cursor: "pointer",
+                    borderColor: coRatio === r ? "#f59e0b" : "rgba(255,255,255,0.15)",
+                    background: coRatio === r ? "#f59e0b" : "rgba(255,255,255,0.05)",
+                    color: coRatio === r ? "#fff" : "#d97706",
+                    fontWeight: coRatio === r ? 800 : 500, fontFamily: "inherit", fontSize: 13,
+                    transition: "all 0.15s",
+                  }}>
+                    {r}%
+                  </button>
+                ))}
+              </div>
+              <div style={{ marginTop: 8, fontSize: 11, color: "rgba(253,230,138,0.7)" }}>
+                現在：会社 <strong style={{ color: "#fde68a" }}>{coRatio}%</strong> ／ 本人 <strong style={{ color: "#fde68a" }}>{100 - coRatio}%</strong>
+              </div>
+            </div>
             <div style={{ fontSize: 12, color: "#d97706", fontWeight: 600, marginBottom: 12, lineHeight: 1.8 }}>
-              ① 都道府県・年収・家賃・賞与月数・年齢・扶養を入力<br />
+              ① 社宅会社負担割合・都道府県・年収・家賃・賞与・年齢・扶養を入力<br />
               ② 「シミュレーションを実行」を押す<br />
               ③ 「共有URLをコピー」して候補者にメール・Slackで送付
             </div>
@@ -792,7 +870,7 @@ export default function App() {
         }}>
           {[
             ["健康保険", `協会けんぽ ${pref}（${KENPO_RATES[pref]}%）`],
-            ["社宅負担", "会社80% / 本人20%"],
+            ["社宅負担", `会社${coRatio}% / 本人${100 - coRatio}%`],
             ["厚生年金", "18.30%（折半）"],
             ["雇用保険", "0.60%（本人）"],
           ].map(([k, v]) => (
@@ -856,7 +934,7 @@ export default function App() {
           </div>
 
           {/* 理論年収・年間負担内訳 */}
-          <CostSummaryTable no={result.no} yes={result.yes} isMobile={isMobile} />
+          <CostSummaryTable no={result.no} yes={result.yes} nenshu={nenshu} coRatio={coRatio} isMobile={isMobile} />
 
           {/* グラフ */}
           <CompareChart no={result.no} yes={result.yes} isMobile={isMobile} />
@@ -870,7 +948,7 @@ export default function App() {
             />
             <PatternCard
               title="✦ 社宅あり（推奨）"
-              subtitle={`月給 ${yen2(result.yes.monthly)}　家賃の80%を会社負担`}
+              subtitle={`月給 ${yen2(result.yes.monthly)}　家賃の${coRatio}%を会社負担`}
               accent="#1d4ed8" data={result.yes} badge isMobile={isMobile}
             />
           </div>
