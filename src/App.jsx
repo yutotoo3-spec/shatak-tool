@@ -655,6 +655,8 @@ const PatternCard = ({ title, isRecommended, data, coRatio, isMobile }) => (
 // メインアプリ
 // ─────────────────────────────────────────────────────────────
 export default function App() {
+  const [manualOpen, setManualOpen] = useState(null); // "hr" | "user" | null
+
   const [nenshu,        setNenshu]        = useState(500);
   const [yachin,        setYachin]        = useState(10);
   const [age,           setAge]           = useState(30);
@@ -1452,8 +1454,168 @@ export default function App() {
         </div>
       )}
 
-      {/* FAQ */}
+      {/* 利用マニュアル */}
       <div style={{ maxWidth: 680, margin: "48px auto 0" }}>
+        <div style={{
+          borderTop: `1px solid ${C.separator}`,
+          paddingTop: 32, marginBottom: 12,
+        }}>
+          <div style={{
+            fontSize: 11, fontWeight: 600,
+            color: C.labelSecond,
+            letterSpacing: "0.08em", textTransform: "uppercase",
+            marginBottom: 16,
+          }}>利用マニュアル</div>
+
+          {/* HR担当側 */}
+          {[
+            {
+              key: "hr",
+              title: "人事担当の方向け",
+              tag: "HR",
+              color: C.blue,
+              steps: [
+                {
+                  label: "HR設定モードに切り替える",
+                  desc: "画面上部のモード切替で「HR 設定モード」を選択します。",
+                },
+                {
+                  label: "健康保険の種類を選択する",
+                  desc: "自社が協会けんぽの場合は都道府県を選択してください。健保組合・共済組合の場合は「健保組合・共済」を選び、業種プリセットまたは実際の被保険者折半率（%）を入力します。",
+                },
+                {
+                  label: "社宅会社負担割合を設定する",
+                  desc: "自社の社宅規定に合わせて会社負担割合を選択します（50〜100%）。",
+                },
+                {
+                  label: "候補者の情報を入力する",
+                  desc: "提示年収・想定家賃・賞与月数・年齢・扶養家族の人数を入力してください。",
+                },
+                {
+                  label: "シミュレーションを実行する",
+                  desc: "「シミュレーションを実行」ボタンを押すと、社宅あり/なしの手取り比較が表示されます。",
+                },
+                {
+                  label: "共有 URL を候補者に送付する",
+                  desc: "HR設定パネル内の「候補者への共有 URL をコピー」ボタンを押してURLをコピーし、メール等で候補者に送付します。URLには入力内容が全て含まれているため、候補者はそのまま結果を確認できます。",
+                },
+              ],
+            },
+            {
+              key: "user",
+              title: "候補者・利用者の方向け",
+              tag: "候補者",
+              color: C.green,
+              steps: [
+                {
+                  label: "URLを開く",
+                  desc: "人事担当から送られてきた URL をブラウザで開きます。条件が入力済みの状態でシミュレーション結果が表示されます。",
+                },
+                {
+                  label: "条件を確認・調整する",
+                  desc: "年収・家賃・年齢・扶養家族の人数などは自分でも変更できます。変更後は「シミュレーションを実行」ボタンを押してください。",
+                },
+                {
+                  label: "手取り比較を確認する",
+                  desc: "「社宅なし」と「社宅あり」の月間・年間手取りを比較できます。棒グラフで内訳（社保・税金・家賃）も一目で確認できます。",
+                },
+                {
+                  label: "内訳を確認する",
+                  desc: "「理論年収・年間負担内訳」テーブルで企業側・個人側それぞれの年間負担額を確認できます。",
+                },
+                {
+                  label: "結果を保存・共有する",
+                  desc: "「結果テキストをコピー」ボタンで全ての試算内容をテキスト形式でコピーできます。メモ帳や Notion 等への貼り付けにご利用ください。",
+                },
+              ],
+            },
+          ].map(({ key, title, tag, color, steps }) => {
+            const isOpen = manualOpen === key;
+            return (
+              <div key={key} style={{
+                marginBottom: 10,
+                borderRadius: 14,
+                border: `1px solid ${isOpen ? color + "55" : C.separator}`,
+                background: C.surface,
+                overflow: "hidden",
+                transition: "border-color 0.2s",
+              }}>
+                {/* アコーディオンヘッダー */}
+                <button
+                  onClick={() => setManualOpen(isOpen ? null : key)}
+                  style={{
+                    width: "100%", padding: "16px 18px",
+                    background: "none", border: "none",
+                    cursor: "pointer", fontFamily: "inherit",
+                    display: "flex", alignItems: "center", gap: 10,
+                    textAlign: "left",
+                  }}
+                >
+                  <span style={{
+                    padding: "2px 9px", borderRadius: 6,
+                    background: color + "22",
+                    color, fontSize: 10, fontWeight: 700,
+                    letterSpacing: "0.04em", whiteSpace: "nowrap",
+                  }}>{tag}</span>
+                  <span style={{
+                    flex: 1,
+                    color: C.labelPrimary,
+                    fontSize: 14, fontWeight: 600,
+                  }}>{title}</span>
+                  <span style={{
+                    color: C.gray, fontSize: 18, lineHeight: 1,
+                    transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s",
+                    display: "inline-block",
+                  }}>⌄</span>
+                </button>
+
+                {/* アコーディオンボディ */}
+                {isOpen && (
+                  <div style={{ padding: "0 18px 18px" }}>
+                    <div style={{
+                      borderTop: `1px solid ${C.separator}`,
+                      paddingTop: 16,
+                    }}>
+                      {steps.map((step, i) => (
+                        <div key={i} style={{
+                          display: "flex", gap: 14, marginBottom: 16,
+                        }}>
+                          {/* ステップ番号 */}
+                          <div style={{
+                            flexShrink: 0,
+                            width: 26, height: 26,
+                            borderRadius: "50%",
+                            background: color + "22",
+                            border: `1.5px solid ${color}55`,
+                            color,
+                            fontSize: 11, fontWeight: 700,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}>{i + 1}</div>
+                          {/* 内容 */}
+                          <div style={{ flex: 1, paddingTop: 3 }}>
+                            <div style={{
+                              color: C.labelPrimary,
+                              fontSize: 13, fontWeight: 600, marginBottom: 4,
+                            }}>{step.label}</div>
+                            <div style={{
+                              color: C.labelSecond,
+                              fontSize: 12, lineHeight: 1.75,
+                            }}>{step.desc}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* FAQ */}
+      <div style={{ maxWidth: 680, margin: "24px auto 0" }}>
         <div style={{
           borderTop: `1px solid ${C.separator}`,
           paddingTop: 32,
