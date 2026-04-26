@@ -1467,12 +1467,12 @@ export default function App() {
             marginBottom: 16,
           }}>利用マニュアル</div>
 
-          {/* HR担当側 */}
           {[
             {
               key: "hr",
               title: "人事担当の方向け",
               tag: "HR",
+              showIn: "hr",
               color: C.blue,
               steps: [
                 {
@@ -1505,6 +1505,7 @@ export default function App() {
               key: "user",
               title: "候補者・利用者の方向け",
               tag: "候補者",
+              showIn: "candidate",
               color: C.green,
               steps: [
                 {
@@ -1529,7 +1530,7 @@ export default function App() {
                 },
               ],
             },
-          ].map(({ key, title, tag, color, steps }) => {
+          ].filter(({ showIn }) => showIn === mode).map(({ key, title, tag, color, steps }) => {
             const isOpen = manualOpen === key;
             return (
               <div key={key} style={{
