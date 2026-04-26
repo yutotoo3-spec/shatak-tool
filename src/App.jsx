@@ -21,6 +21,17 @@ const KENPO_RATES = {
 const PREFS = Object.keys(KENPO_RATES);
 
 // ─────────────────────────────────────────────────────────────
+// 健康保険組合・共済組合 プリセット（被保険者折半率 %）
+// ─────────────────────────────────────────────────────────────
+const KUMIAI_PRESETS = [
+  { name: "IT・通信系", rate: 4.50, desc: "例: 情報サービス産業健保" },
+  { name: "製造業系",   rate: 4.80, desc: "例: 電機・機械系健保組合" },
+  { name: "金融・保険", rate: 4.30, desc: "例: 銀行・生保系健保組合" },
+  { name: "流通・小売", rate: 5.00, desc: "例: 小売業健保組合" },
+  { name: "共済組合",   rate: 4.10, desc: "例: 公務員共済（標準的目安）" },
+];
+
+// ─────────────────────────────────────────────────────────────
 // 計算ロジック
 // ─────────────────────────────────────────────────────────────
 const HYOJUN_TABLE = [
@@ -644,17 +655,19 @@ const PatternCard = ({ title, isRecommended, data, coRatio, isMobile }) => (
 // メインアプリ
 // ─────────────────────────────────────────────────────────────
 export default function App() {
-  const [nenshu,   setNenshu]   = useState(500);
-  const [yachin,   setYachin]   = useState(10);
-  const [age,      setAge]      = useState(30);
-  const [dep,      setDep]      = useState(0);
-  const [pref,     setPref]     = useState("京都");
-  const [bonus,    setBonus]    = useState(2);
-  const [coRatio,  setCoRatio]  = useState(80);
-  const [ran,      setRan]      = useState(false);
-  const [mode,     setMode]     = useState("candidate");
-  const [copied,   setCopied]   = useState("");
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+  const [nenshu,        setNenshu]        = useState(500);
+  const [yachin,        setYachin]        = useState(10);
+  const [age,           setAge]           = useState(30);
+  const [dep,           setDep]           = useState(0);
+  const [pref,          setPref]          = useState("京都");
+  const [bonus,         setBonus]         = useState(2);
+  const [coRatio,       setCoRatio]       = useState(80);
+  const [insuranceType, setInsuranceType] = useState("kyokai"); // "kyokai" | "kumiai"
+  const [customKenpoRate, setCustomKenpoRate] = useState(5.0);  // 健保組合用 被保険者折半率%
+  const [ran,           setRan]           = useState(false);
+  const [mode,          setMode]          = useState("candidate");
+  const [copied,        setCopied]        = useState("");
+  const [isMobile,      setIsMobile]      = useState(window.innerWidth < 640);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 640);
@@ -674,12 +687,19 @@ export default function App() {
       if (p.get("p") && KENPO_RATES[p.get("p")]) setPref(p.get("p"));
       if (p.get("b") != null) setBonus(+p.get("b"));
       if (p.get("r")) setCoRatio(Math.min(100, Math.max(50, +p.get("r"))));
+      if (p.get("it") === "kumiai") {
+        setInsuranceType("kumiai");
+        if (p.get("kr")) setCustomKenpoRate(Math.min(15, Math.max(1, +p.get("kr"))));
+      }
       setRan(true);
       setMode("candidate");
     } catch {}
   }, []);
 
-  const kenpoRate = useMemo(() => (KENPO_RATES[pref] ?? 5.005) / 100, [pref]);
+  const kenpoRate = useMemo(() => {
+    if (insuranceType === "kumiai") return customKenpoRate / 100;
+    return (KENPO_RATES[pref] ?? 5.005) / 100;
+  }, [insuranceType, customKenpoRate, pref]);
 
   const result = useMemo(() => {
     if (!ran) return null;
@@ -693,9 +713,14 @@ export default function App() {
   const diff = result ? result.yes.annual_tedori - result.no.annual_tedori : 0;
 
   const buildShareURL = useCallback(() => {
-    const params = new URLSearchParams({ n: nenshu, y: yachin, a: age, d: dep, p: pref, b: bonus, r: coRatio });
+    const base = { n: nenshu, y: yachin, a: age, d: dep, p: pref, b: bonus, r: coRatio };
+    if (insuranceType === "kumiai") {
+      base.it = "kumiai";
+      base.kr = customKenpoRate;
+    }
+    const params = new URLSearchParams(base);
     return `${window.location.href.split("#")[0]}#${params.toString()}`;
-  }, [nenshu, yachin, age, dep, pref, bonus, coRatio]);
+  }, [nenshu, yachin, age, dep, pref, bonus, coRatio, insuranceType, customKenpoRate]);
 
   const handleCopyURL = useCallback(async () => {
     try {
@@ -721,7 +746,9 @@ export default function App() {
       `  理論年収（提示年収）: ${yen2(nenshuYen)}`,
       `  想定家賃（月額）    : ${yen(yachin * 10000)}`,
       `  社宅会社負担割合    : ${coRatio}%（本人負担 ${100 - coRatio}%）`,
-      `  都道府県            : ${pref}（協会けんぽ ${KENPO_RATES[pref]}%）`,
+      insuranceType === "kumiai"
+        ? `  健康保険            : 健康保険組合・共済組合（被保険者折半率 ${customKenpoRate}%）`
+        : `  都道府県            : ${pref}（協会けんぽ ${KENPO_RATES[pref]}%）`,
       `  賞与                : ${bonus}ヶ月`,
       `  年齢                : ${age}歳${age >= 40 ? "（介護保険あり）" : ""}`,
       `  扶養家族            : ${dep}人`,
@@ -774,7 +801,9 @@ export default function App() {
       "═══════════════════════════════════════",
       "",
       "住民税は概算値です（前年所得ベース）。",
-      `協会けんぽ${pref}支部の料率を使用。厚生年金18.30%・雇用保険0.60%。`,
+      insuranceType === "kumiai"
+        ? `健康保険組合・共済組合の被保険者折半率 ${customKenpoRate}% を使用。厚生年金18.30%・雇用保険0.60%。`
+        : `協会けんぽ${pref}支部の料率を使用。厚生年金18.30%・雇用保険0.60%。`,
       "実際の金額は年末調整・確定申告・各種控除により異なります。",
     ].join("\n");
     try {
@@ -896,6 +925,194 @@ export default function App() {
             </div>
           </div>
           <div style={{ padding: "16px 20px" }}>
+
+            {/* 健康保険の種類 */}
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: C.labelSecond, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 10 }}>
+                健康保険の種類
+              </div>
+
+              {/* 協会けんぽ / 健保組合 切替 */}
+              <div style={{
+                display: "inline-flex", padding: 3,
+                borderRadius: 10, background: "rgba(118,118,128,0.24)",
+                gap: 2, marginBottom: 14,
+              }}>
+                {[["kyokai", "協会けんぽ"], ["kumiai", "健保組合・共済"]].map(([t, label]) => (
+                  <button key={t} onClick={() => { setInsuranceType(t); resetRan(); }} style={{
+                    padding: "7px 16px",
+                    border: "none", borderRadius: 8, cursor: "pointer",
+                    fontFamily: "inherit", fontSize: 13,
+                    fontWeight: insuranceType === t ? 600 : 400,
+                    background: insuranceType === t ? C.surface : "transparent",
+                    color: insuranceType === t ? C.labelPrimary : C.labelSecond,
+                    boxShadow: insuranceType === t ? "0 1px 4px rgba(0,0,0,0.3)" : "none",
+                    transition: "all 0.15s",
+                    whiteSpace: "nowrap",
+                  }}>{label}</button>
+                ))}
+              </div>
+
+              {/* 協会けんぽ: 都道府県選択 */}
+              {insuranceType === "kyokai" && (
+                <div>
+                  <div style={{ fontSize: 11, color: C.labelSecond, marginBottom: 8 }}>
+                    都道府県を選択すると自動で料率を適用します
+                  </div>
+                  <div style={{
+                    display: "flex", alignItems: "center",
+                    gap: 10, flexWrap: "wrap",
+                  }}>
+                    <div style={{ flex: "1 1 180px" }}>
+                      <select
+                        value={pref}
+                        onChange={e => { setPref(e.target.value); resetRan(); }}
+                        style={{
+                          width: "100%",
+                          padding: "9px 12px",
+                          border: `1px solid ${C.separator}`,
+                          borderRadius: 10,
+                          background: C.surface2,
+                          fontSize: 13, color: C.labelPrimary,
+                          outline: "none", fontFamily: "inherit", cursor: "pointer",
+                          appearance: "none", WebkitAppearance: "none",
+                          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238E8E93' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`,
+                          backgroundRepeat: "no-repeat",
+                          backgroundPosition: "right 12px center",
+                          paddingRight: 36,
+                        }}
+                      >
+                        {PREFS.map(p => (
+                          <option key={p} value={p}>{p}　（{KENPO_RATES[p]}%）</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{
+                      padding: "8px 14px",
+                      background: "rgba(10,132,255,0.12)",
+                      borderRadius: 8,
+                      fontSize: 13, color: C.blue, fontWeight: 600,
+                      whiteSpace: "nowrap",
+                    }}>
+                      被保険者折半率 {KENPO_RATES[pref]}%
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 健保組合・共済 */}
+              {insuranceType === "kumiai" && (
+                <div>
+                  <div style={{ fontSize: 11, color: C.labelSecond, marginBottom: 10 }}>
+                    業種別の目安を選択するか、実際の被保険者折半率（%）を直接入力してください
+                  </div>
+
+                  {/* プリセットボタン */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+                    {KUMIAI_PRESETS.map(p => (
+                      <button
+                        key={p.name}
+                        onClick={() => { setCustomKenpoRate(p.rate); resetRan(); }}
+                        style={{
+                          padding: "10px 14px",
+                          borderRadius: 10,
+                          border: `1px solid ${Math.abs(customKenpoRate - p.rate) < 0.01 ? C.blue : C.separator}`,
+                          background: Math.abs(customKenpoRate - p.rate) < 0.01
+                            ? "rgba(10,132,255,0.12)"
+                            : C.surface2,
+                          color: C.labelPrimary,
+                          cursor: "pointer", fontFamily: "inherit",
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          transition: "all 0.15s",
+                          textAlign: "left",
+                        }}
+                      >
+                        <div>
+                          <span style={{
+                            fontSize: 13, fontWeight: Math.abs(customKenpoRate - p.rate) < 0.01 ? 600 : 400,
+                            color: Math.abs(customKenpoRate - p.rate) < 0.01 ? C.blue : C.labelPrimary,
+                            marginRight: 8,
+                          }}>{p.name}</span>
+                          <span style={{ fontSize: 11, color: C.gray }}>{p.desc}</span>
+                        </div>
+                        <span style={{
+                          fontSize: 13, fontWeight: 600,
+                          color: Math.abs(customKenpoRate - p.rate) < 0.01 ? C.blue : C.labelSecond,
+                          whiteSpace: "nowrap",
+                        }}>{p.rate}%</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* 手動入力 */}
+                  <div style={{
+                    padding: "14px",
+                    background: C.surface2,
+                    borderRadius: 12,
+                    border: `1px solid ${C.separator}`,
+                  }}>
+                    <div style={{ fontSize: 11, color: C.labelSecond, marginBottom: 8, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                      被保険者折半率を直接入力
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{
+                        flex: 1,
+                        display: "flex", alignItems: "center",
+                        border: `1px solid ${C.separator}`,
+                        borderRadius: 10, overflow: "hidden",
+                        background: C.surface3,
+                      }}>
+                        <button
+                          onClick={() => { setCustomKenpoRate(v => +(Math.max(1, v - 0.1).toFixed(2))); resetRan(); }}
+                          style={{
+                            padding: "10px 16px", background: "none", border: "none",
+                            fontSize: 18, color: C.blue, cursor: "pointer",
+                            borderRight: `1px solid ${C.separator}`,
+                            lineHeight: 1, fontFamily: "inherit", fontWeight: 300,
+                          }}>−</button>
+                        <input
+                          type="number"
+                          value={customKenpoRate}
+                          onChange={e => { setCustomKenpoRate(+e.target.value); resetRan(); }}
+                          min={1} max={15} step={0.1}
+                          style={{
+                            flex: 1, padding: "10px 4px",
+                            border: "none", background: "transparent",
+                            textAlign: "center", fontSize: 14,
+                            color: C.labelPrimary, outline: "none",
+                            fontFamily: "inherit", fontWeight: 500,
+                          }}
+                        />
+                        <button
+                          onClick={() => { setCustomKenpoRate(v => +(Math.min(15, v + 0.1).toFixed(2))); resetRan(); }}
+                          style={{
+                            padding: "10px 16px", background: "none", border: "none",
+                            fontSize: 18, color: C.blue, cursor: "pointer",
+                            borderLeft: `1px solid ${C.separator}`,
+                            lineHeight: 1, fontFamily: "inherit", fontWeight: 300,
+                          }}>＋</button>
+                      </div>
+                      <div style={{ fontSize: 14, color: C.labelSecond, fontWeight: 500 }}>%</div>
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 11, color: C.gray }}>
+                      協会けんぽ全国平均は約4.9〜5.2%。健保組合は一般に3〜6%程度です。
+                    </div>
+                  </div>
+
+                  {/* 参考: 適用料率表示 */}
+                  <div style={{
+                    marginTop: 10,
+                    padding: "8px 14px",
+                    background: "rgba(10,132,255,0.08)",
+                    borderRadius: 8,
+                    fontSize: 12, color: C.blue,
+                  }}>
+                    適用料率（被保険者折半）: <strong>{customKenpoRate}%</strong>　全体料率: {(customKenpoRate * 2).toFixed(2)}%
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* 社宅会社負担割合 */}
             <div style={{ marginBottom: 18 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: C.labelSecond, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 10 }}>
@@ -1072,7 +1289,11 @@ export default function App() {
           display: "flex", gap: "6px 20px", flexWrap: "wrap",
         }}>
           {[
-            ["健康保険", `協会けんぽ ${pref}（${KENPO_RATES[pref]}%）`],
+            ["健康保険",
+              insuranceType === "kumiai"
+                ? `健保組合・共済 ${customKenpoRate}%（カスタム）`
+                : `協会けんぽ ${pref}（${KENPO_RATES[pref]}%）`
+            ],
             ["社宅負担", `会社${coRatio}% / 本人${100 - coRatio}%`],
             ["厚生年金", "18.30%（折半）"],
             ["雇用保険", "0.60%（本人）"],
