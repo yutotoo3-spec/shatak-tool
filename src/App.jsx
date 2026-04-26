@@ -850,32 +850,16 @@ export default function App() {
 
       {/* ヘッダー */}
       <div style={{ textAlign: "center", marginBottom: isMobile ? 28 : 36 }}>
-        <div style={{
-          display: "inline-block",
-          fontSize: 11, fontWeight: 600,
-          color: C.blue,
-          letterSpacing: "0.1em", textTransform: "uppercase",
-          marginBottom: 10,
-        }}>
-          HR Tool — 借り上げ社宅制度
-        </div>
         <h1 style={{
           color: C.labelPrimary,
           fontSize: isMobile ? 22 : 28,
           fontWeight: 700,
-          margin: "0 0 8px",
+          margin: "0 0 20px",
           lineHeight: 1.2,
           letterSpacing: "-0.02em",
         }}>
-          オファー比較シミュレーター
+          借り上げ社宅制度 オファー比較シミュレーター
         </h1>
-        <p style={{
-          color: C.labelSecond,
-          fontSize: 13, margin: "0 0 20px",
-          fontWeight: 400,
-        }}>
-          協会けんぽ 全47都道府県対応　·　賞与考慮あり
-        </p>
 
         {/* セグメントコントロール */}
         <div style={{
