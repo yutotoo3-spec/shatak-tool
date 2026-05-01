@@ -657,13 +657,13 @@ const PatternCard = ({ title, isRecommended, data, coRatio, isMobile }) => (
 export default function App() {
   const [manualOpen, setManualOpen] = useState(null); // "hr" | "user" | null
 
-  const [nenshu,        setNenshu]        = useState(500);
-  const [yachin,        setYachin]        = useState(10);
+  const [nenshu,        setNenshu]        = useState(800);
+  const [yachin,        setYachin]        = useState(20);
   const [age,           setAge]           = useState(30);
   const [dep,           setDep]           = useState(0);
   const [pref,          setPref]          = useState("京都");
-  const [bonus,         setBonus]         = useState(2);
-  const [coRatio,       setCoRatio]       = useState(80);
+  const [bonus,         setBonus]         = useState(0);
+  const [coRatio,       setCoRatio]       = useState(70);
   const [insuranceType, setInsuranceType] = useState("kyokai"); // "kyokai" | "kumiai"
   const [customKenpoRate, setCustomKenpoRate] = useState(5.0);  // 健保組合用 被保険者折半率%
   const [ran,           setRan]           = useState(false);
