@@ -87,14 +87,14 @@ const calcPattern = (nenshu, yachin, age, dep, withShatak, kenpoRate, bonusMonth
   const kenpo = Math.round(h * kenpoRate);
   const kaigo = age >= 40 ? Math.round(h * 0.0081) : 0;
   const kosei = Math.round(h * 0.0915);
-  const koyo  = Math.round(monthly * 0.0060);
+  const koyo  = Math.round(monthly * 0.0050);
   const monthly_shakai = kenpo + kaigo + kosei + koyo;
   const bh = Math.floor(annualBonus / 1000) * 1000;
   const bonus_shakai =
     Math.round(bh * kenpoRate) +
     (age >= 40 ? Math.round(bh * 0.0081) : 0) +
     Math.round(Math.min(bh, 1500000) * 0.0915) +
-    Math.round(annualBonus * 0.0060);
+    Math.round(annualBonus * 0.0050);
   const annual_shakai = monthly_shakai * 12 + bonus_shakai;
   const kazei = Math.max(0, teiji - kyuyoKojo(teiji) - annual_shakai - 480000 - 380000 * dep);
   const annual_shotoku = calcShotoku(kazei);
@@ -810,8 +810,8 @@ export default function App() {
       "",
       "住民税は概算値です（前年所得ベース）。",
       insuranceType === "kumiai"
-        ? `健康保険組合・共済組合の被保険者折半率 ${customKenpoRate}% を使用。厚生年金18.30%・雇用保険0.60%・介護保険1.62%（折半）。`
-        : `協会けんぽ${pref}支部 ${RATE_YEAR}年度料率を使用。厚生年金18.30%・雇用保険0.60%・介護保険1.62%（折半）。`,
+        ? `健康保険組合・共済組合の被保険者折半率 ${customKenpoRate}% を使用。厚生年金18.30%・雇用保険0.50%・介護保険1.62%（折半）。`
+        : `協会けんぽ${pref}支部 ${RATE_YEAR}年度料率を使用。厚生年金18.30%・雇用保険0.50%・介護保険1.62%（折半）。`,
       "実際の金額は年末調整・確定申告・各種控除により異なります。",
     ].join("\n");
     try {
@@ -1288,7 +1288,7 @@ export default function App() {
             ],
             ["社宅負担", `会社${coRatio}% / 本人${100 - coRatio}%`],
             ["厚生年金", "18.30%（折半）"],
-            ["雇用保険", "0.60%（本人）"],
+            ["雇用保険", "0.50%（本人）"],
             ["介護保険", "1.62%（折半・40歳以上）"],
           ].map(([k, v]) => (
             <span key={k} style={{ fontSize: 11, color: C.formSecond }}>
@@ -1678,7 +1678,7 @@ export default function App() {
         color: C.gray, fontSize: 11, lineHeight: 1.8,
       }}>
         <div>本ツールは概算シミュレーション用です。実際の金額は状況により異なります。</div>
-        <div>協会けんぽ {RATE_YEAR} 年度料率を使用。厚生年金 18.30% · 雇用保険 0.60%（被保険者）· 介護保険 1.62%（折半）。</div>
+        <div>協会けんぽ {RATE_YEAR} 年度料率を使用。厚生年金 18.30% · 雇用保険 0.50%（被保険者）· 介護保険 1.62%（折半）。</div>
       </div>
 
       <style>{`
