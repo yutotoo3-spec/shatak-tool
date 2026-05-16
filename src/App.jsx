@@ -30,11 +30,16 @@ const PREFS = Object.keys(KENPO_RATES);
 // 健康保険組合・共済組合 プリセット（被保険者折半率 %）
 // ─────────────────────────────────────────────────────────────
 const KUMIAI_PRESETS = [
-  { name: "IT・通信系", rate: 4.50, desc: "例: 情報サービス産業健保" },
-  { name: "製造業系",   rate: 4.80, desc: "例: 電機・機械系健保組合" },
-  { name: "金融・保険", rate: 4.30, desc: "例: 銀行・生保系健保組合" },
-  { name: "流通・小売", rate: 5.00, desc: "例: 小売業健保組合" },
-  { name: "共済組合",   rate: 4.10, desc: "例: 公務員共済（標準的目安）" },
+  { name: "IT・通信系",     rate: 4.50, desc: "例: 情報サービス産業健保" },
+  { name: "製造業系",       rate: 4.80, desc: "例: 電機・機械系健保組合" },
+  { name: "金融・保険",     rate: 4.30, desc: "例: 銀行・生保系健保組合" },
+  { name: "流通・小売",     rate: 5.00, desc: "例: 小売業健保組合" },
+  { name: "共済組合",       rate: 4.10, desc: "例: 公務員共済（標準的目安）" },
+  { name: "医療・福祉系",   rate: 4.70, desc: "例: 医師国保・病院系健保" },
+  { name: "建設業",         rate: 4.90, desc: "例: 建設業健保組合" },
+  { name: "飲食・サービス", rate: 5.10, desc: "例: 飲食・サービス業健保" },
+  { name: "運輸・物流",     rate: 4.95, desc: "例: 運輸・物流健保組合" },
+  { name: "印刷・出版",     rate: 4.60, desc: "例: 印刷・出版健保組合" },
 ];
 
 // ─────────────────────────────────────────────────────────────
@@ -676,6 +681,7 @@ export default function App() {
   const [mode,          setMode]          = useState("candidate");
   const [copied,        setCopied]        = useState("");
   const [isMobile,      setIsMobile]      = useState(window.innerWidth < 640);
+  const [extraScenarios, setExtraScenarios] = useState([]); // [{id,label,yachin,coRatio}]
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 640);
@@ -822,6 +828,41 @@ export default function App() {
 
   const handlePrint = () => window.print();
   const resetRan = () => setRan(false);
+
+  const handleExportCSV = useCallback(() => {
+    if (!result) return;
+    const { no, yes } = result;
+    const rows = [
+      ["項目", "社宅なし", `社宅あり（会社${coRatio}%負担）`, "差額"],
+      ["年間手取り（実質）（円）", no.annual_tedori, yes.annual_tedori, yes.annual_tedori - no.annual_tedori],
+      ["月間手取り（実質）（円）", no.m_tedori, yes.m_tedori, yes.m_tedori - no.m_tedori],
+      ["社会保険料・年間（円）", no.annual_shakai, yes.annual_shakai, yes.annual_shakai - no.annual_shakai],
+      ["所得税・年間（円）", no.annual_shotoku, yes.annual_shotoku, yes.annual_shotoku - no.annual_shotoku],
+      ["住民税・年間概算（円）", no.annual_jumin, yes.annual_jumin, yes.annual_jumin - no.annual_jumin],
+      ["家賃自己負担・年間（円）", no.annual_yachin, yes.annual_yachin, yes.annual_yachin - no.annual_yachin],
+      ["会社年間コスト（円）", Math.round(no.companyTotal * 12), Math.round(yes.companyTotal * 12), Math.round((yes.companyTotal - no.companyTotal) * 12)],
+      [],
+      ["入力条件"],
+      ["理論年収（万円）", nenshu],
+      ["想定家賃・月額（万円）", yachin],
+      ["社宅会社負担割合（%）", coRatio],
+      insuranceType === "kumiai"
+        ? ["健康保険", `健保組合・共済 ${customKenpoRate}%`]
+        : ["健康保険", `協会けんぽ ${pref}（${KENPO_RATES[pref]}%）`],
+      ["賞与月数", bonus],
+      ["年齢", age],
+      ["扶養家族（人）", dep],
+    ];
+    const bom = "﻿";
+    const csv = bom + rows.map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "shatak-simulation.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [result, nenshu, yachin, age, dep, bonus, coRatio, pref, insuranceType, customKenpoRate]);
 
   // フォーム用スタイル
   const lbl = {
@@ -1415,22 +1456,33 @@ export default function App() {
             }}>
               {copied === "text" ? "コピーしました" : "結果テキストをコピー"}
             </button>
-            {mode === "hr" && (
-              <button onClick={handleCopyURL} style={{
-                flex: 1,
-                padding: isMobile ? "14px" : "12px",
-                borderRadius: 10,
-                background: copied === "url" ? C.green : C.blue,
-                color: "#fff", fontWeight: 500,
-                fontSize: isMobile ? 14 : 13,
-                border: "none", cursor: "pointer",
-                fontFamily: "inherit",
-                transition: "background 0.25s",
-                letterSpacing: "-0.01em",
-              }}>
-                {copied === "url" ? "URL をコピーしました" : "共有 URL をコピー"}
-              </button>
-            )}
+            <button onClick={handleExportCSV} style={{
+              flex: isMobile ? "none" : "0 0 auto",
+              padding: isMobile ? "14px" : "12px 18px",
+              borderRadius: 10,
+              background: "transparent",
+              color: C.gray, fontWeight: 500,
+              fontSize: isMobile ? 14 : 13,
+              border: `1px solid ${C.separator}`,
+              cursor: "pointer", fontFamily: "inherit",
+              letterSpacing: "-0.01em",
+            }}>
+              CSV 出力
+            </button>
+            <button onClick={handleCopyURL} style={{
+              flex: 1,
+              padding: isMobile ? "14px" : "12px",
+              borderRadius: 10,
+              background: copied === "url" ? C.green : C.blue,
+              color: "#fff", fontWeight: 500,
+              fontSize: isMobile ? 14 : 13,
+              border: "none", cursor: "pointer",
+              fontFamily: "inherit",
+              transition: "background 0.25s",
+              letterSpacing: "-0.01em",
+            }}>
+              {copied === "url" ? "URL をコピーしました" : "共有 URL をコピー"}
+            </button>
             <button onClick={handlePrint} style={{
               flex: isMobile ? "none" : "0 0 auto",
               padding: isMobile ? "14px" : "12px 20px",
@@ -1458,6 +1510,185 @@ export default function App() {
               <Badge approx={true} /> 住民税は前年所得ベースのため概算
             </span>
           </div>
+
+          {/* 複数シナリオ比較（HR モードのみ） */}
+          {mode === "hr" && (
+            <div style={{ marginTop: 20 }}>
+              <div style={{
+                borderRadius: 16,
+                background: C.surface,
+                border: `1px solid ${C.separator}`,
+                overflow: "hidden",
+              }}>
+                {/* ヘッダー */}
+                <div style={{
+                  padding: "14px 20px",
+                  borderBottom: `1px solid ${C.separator}`,
+                  display: "flex", alignItems: "center",
+                  justifyContent: "space-between", gap: 12,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: C.orange }} />
+                    <span style={{ color: C.labelPrimary, fontSize: 14, fontWeight: 600 }}>複数シナリオ比較</span>
+                    <span style={{ color: C.labelSecond, fontSize: 12 }}>家賃・負担割合の条件を変えて比べる</span>
+                  </div>
+                  {extraScenarios.length < 2 && (
+                    <button
+                      onClick={() => setExtraScenarios(prev => [
+                        ...prev,
+                        { id: Date.now(), label: `シナリオ ${prev.length + 2}`, yachin, coRatio },
+                      ])}
+                      style={{
+                        padding: "6px 14px", borderRadius: 8,
+                        border: `1px solid ${C.blue}`, background: "rgba(10,132,255,0.12)",
+                        color: C.blue, fontSize: 12, fontWeight: 600,
+                        cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+                      }}
+                    >
+                      ＋ シナリオを追加
+                    </button>
+                  )}
+                </div>
+
+                {/* シナリオ入力行 */}
+                <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+                  {/* メインシナリオ（編集不可、参照用） */}
+                  {(() => {
+                    const mainResult = result.yes;
+                    return (
+                      <div style={{
+                        padding: "12px 16px", borderRadius: 12,
+                        background: "rgba(10,132,255,0.08)",
+                        border: `1px solid ${C.blue}44`,
+                        display: "flex", flexWrap: "wrap", gap: 10,
+                        alignItems: "center", justifyContent: "space-between",
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{
+                            padding: "2px 8px", borderRadius: 5, fontSize: 10, fontWeight: 700,
+                            background: C.blue + "22", color: C.blue, letterSpacing: "0.04em",
+                          }}>シナリオ 1（現在）</span>
+                          <span style={{ fontSize: 13, color: C.labelSecond }}>
+                            家賃 <strong style={{ color: C.labelPrimary }}>{yachin}万円</strong>
+                            　会社負担 <strong style={{ color: C.labelPrimary }}>{coRatio}%</strong>
+                            　本人負担 <strong style={{ color: C.labelPrimary }}>{Math.round(yachin * (1 - coRatio / 100) * 10) / 10}万/月</strong>
+                          </span>
+                        </div>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: C.blue, whiteSpace: "nowrap" }}>
+                          手取り {yen2(mainResult.annual_tedori)}/年
+                        </span>
+                      </div>
+                    );
+                  })()}
+
+                  {/* 追加シナリオ */}
+                  {extraScenarios.map((sc, idx) => {
+                    const n = nenshu * 10000, y = sc.yachin * 10000;
+                    const scResult = calcPattern(n, y, age, dep, true, kenpoRate, bonus, sc.coRatio);
+                    const scDiff = scResult.annual_tedori - result.no.annual_tedori;
+                    return (
+                      <div key={sc.id} style={{
+                        padding: "12px 16px", borderRadius: 12,
+                        background: C.surface2,
+                        border: `1px solid ${C.separator}`,
+                      }}>
+                        <div style={{
+                          display: "flex", alignItems: "center",
+                          justifyContent: "space-between", marginBottom: 10, gap: 8,
+                        }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{
+                              padding: "2px 8px", borderRadius: 5, fontSize: 10, fontWeight: 700,
+                              background: C.orange + "22", color: C.orange, letterSpacing: "0.04em",
+                            }}>シナリオ {idx + 2}</span>
+                            <input
+                              value={sc.label}
+                              onChange={e => setExtraScenarios(prev =>
+                                prev.map(s => s.id === sc.id ? { ...s, label: e.target.value } : s)
+                              )}
+                              style={{
+                                background: "transparent", border: "none",
+                                color: C.labelPrimary, fontSize: 13, fontWeight: 600,
+                                fontFamily: "inherit", outline: "none", width: 120,
+                              }}
+                              placeholder="ラベル"
+                            />
+                          </div>
+                          <button
+                            onClick={() => setExtraScenarios(prev => prev.filter(s => s.id !== sc.id))}
+                            style={{
+                              background: "none", border: "none", color: C.gray,
+                              cursor: "pointer", fontSize: 16, padding: "2px 6px",
+                              fontFamily: "inherit",
+                            }}
+                          >×</button>
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }}>
+                          <div style={{ flex: "1 1 140px" }}>
+                            <div style={{ fontSize: 10, color: C.gray, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 6 }}>
+                              家賃・月額（万円）
+                            </div>
+                            <div style={{
+                              display: "flex", alignItems: "center",
+                              border: `1px solid ${C.separator}`, borderRadius: 8, overflow: "hidden",
+                              background: C.surface3,
+                            }}>
+                              <button onClick={() => setExtraScenarios(prev => prev.map(s => s.id === sc.id ? { ...s, yachin: Math.max(1, +(s.yachin - 0.5).toFixed(1)) } : s))}
+                                style={{ padding: "8px 12px", background: "none", border: "none", color: C.blue, fontSize: 16, cursor: "pointer", borderRight: `1px solid ${C.separator}`, fontFamily: "inherit" }}>−</button>
+                              <input
+                                type="number" value={sc.yachin} min={1} max={100} step={0.5}
+                                onChange={e => setExtraScenarios(prev => prev.map(s => s.id === sc.id ? { ...s, yachin: +e.target.value } : s))}
+                                style={{ flex: 1, padding: "8px 4px", border: "none", background: "transparent", textAlign: "center", fontSize: 13, color: C.labelPrimary, outline: "none", fontFamily: "inherit" }}
+                              />
+                              <button onClick={() => setExtraScenarios(prev => prev.map(s => s.id === sc.id ? { ...s, yachin: Math.min(100, +(s.yachin + 0.5).toFixed(1)) } : s))}
+                                style={{ padding: "8px 12px", background: "none", border: "none", color: C.blue, fontSize: 16, cursor: "pointer", borderLeft: `1px solid ${C.separator}`, fontFamily: "inherit" }}>＋</button>
+                            </div>
+                          </div>
+                          <div style={{ flex: "1 1 180px" }}>
+                            <div style={{ fontSize: 10, color: C.gray, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 6 }}>
+                              会社負担割合
+                            </div>
+                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                              {[50, 60, 70, 75, 80, 85, 90, 100].map(r => (
+                                <button key={r}
+                                  onClick={() => setExtraScenarios(prev => prev.map(s => s.id === sc.id ? { ...s, coRatio: r } : s))}
+                                  style={{
+                                    padding: "5px 10px", borderRadius: 6,
+                                    border: `1px solid ${sc.coRatio === r ? C.orange : C.separator}`,
+                                    background: sc.coRatio === r ? C.orange + "22" : "transparent",
+                                    color: sc.coRatio === r ? C.orange : C.labelSecond,
+                                    fontWeight: sc.coRatio === r ? 600 : 400,
+                                    fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+                                  }}
+                                >{r}%</button>
+                              ))}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                            <div style={{ fontSize: 11, color: C.gray, marginBottom: 3 }}>
+                              本人負担 {Math.round(sc.yachin * (1 - sc.coRatio / 100) * 10) / 10}万/月
+                            </div>
+                            <div style={{ fontSize: 15, fontWeight: 700, color: C.orange }}>
+                              手取り {yen2(scResult.annual_tedori)}/年
+                            </div>
+                            <div style={{ fontSize: 11, color: scDiff >= 0 ? C.green : C.red }}>
+                              社宅なし比 {scDiff >= 0 ? "+" : ""}{yen2(scDiff)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {extraScenarios.length === 0 && (
+                    <div style={{ padding: "8px 0 4px", fontSize: 12, color: C.gray, textAlign: "center" }}>
+                      「＋ シナリオを追加」で異なる条件を並べて比較できます（最大 2 つ追加）
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
