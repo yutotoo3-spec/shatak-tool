@@ -682,6 +682,7 @@ export default function App() {
   const [copied,        setCopied]        = useState("");
   const [isMobile,      setIsMobile]      = useState(window.innerWidth < 640);
   const [extraScenarios, setExtraScenarios] = useState([]); // [{id,label,yachin,coRatio}]
+  const [joinYM,        setJoinYM]        = useState(""); // "YYYY-MM" 入社想定年月
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 640);
@@ -705,6 +706,7 @@ export default function App() {
         setInsuranceType("kumiai");
         if (p.get("kr")) setCustomKenpoRate(Math.min(15, Math.max(1, +p.get("kr"))));
       }
+      if (p.get("jm")) setJoinYM(p.get("jm"));
       setRan(true);
       setMode("candidate");
     } catch {}
@@ -732,9 +734,10 @@ export default function App() {
       base.it = "kumiai";
       base.kr = customKenpoRate;
     }
+    if (joinYM) base.jm = joinYM;
     const params = new URLSearchParams(base);
     return `${window.location.href.split("#")[0]}#${params.toString()}`;
-  }, [nenshu, yachin, age, dep, pref, bonus, coRatio, insuranceType, customKenpoRate]);
+  }, [nenshu, yachin, age, dep, pref, bonus, coRatio, insuranceType, customKenpoRate, joinYM]);
 
   const handleCopyURL = useCallback(async () => {
     try {
@@ -766,6 +769,7 @@ export default function App() {
       `  賞与                : ${bonus}ヶ月`,
       `  年齢                : ${age}歳${age >= 40 ? "（介護保険あり）" : ""}`,
       `  扶養家族            : ${dep}人`,
+      ...(joinYM ? [`  入社想定月          : ${joinYM.replace("-", "年")}月`] : []),
       "",
       "───────────────────────────────────────",
       "【社宅なし】",
@@ -824,7 +828,7 @@ export default function App() {
       await navigator.clipboard.writeText(text);
       setCopied("text"); setTimeout(() => setCopied(""), 2500);
     } catch { alert("コピーに失敗しました。"); }
-  }, [result, diff, pref, bonus, age, dep, nenshu, yachin, coRatio]);
+  }, [result, diff, pref, bonus, age, dep, nenshu, yachin, coRatio, joinYM, insuranceType, customKenpoRate]);
 
   const handlePrint = () => window.print();
   const resetRan = () => setRan(false);
@@ -1172,6 +1176,57 @@ export default function App() {
               </div>
             </div>
 
+            {/* 入社想定日 */}
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: C.labelSecond, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 10 }}>
+                入社想定日（任意）
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <input
+                  type="month"
+                  value={joinYM}
+                  onChange={e => setJoinYM(e.target.value)}
+                  min="2025-01"
+                  max="2030-12"
+                  style={{
+                    padding: "9px 12px",
+                    border: `1px solid ${joinYM ? C.blue + "88" : C.separator}`,
+                    borderRadius: 10,
+                    background: C.surface2,
+                    fontSize: 13, color: joinYM ? C.labelPrimary : C.gray,
+                    outline: "none", fontFamily: "inherit",
+                    colorScheme: "dark",
+                  }}
+                />
+                {joinYM && (
+                  <button
+                    onClick={() => setJoinYM("")}
+                    style={{ background: "none", border: "none", color: C.gray, cursor: "pointer", fontSize: 16, padding: "4px 8px", fontFamily: "inherit" }}
+                  >×</button>
+                )}
+              </div>
+              {joinYM && (() => {
+                const m = parseInt(joinYM.split("-")[1], 10);
+                const y = parseInt(joinYM.split("-")[0], 10);
+                const fiscalYear = m >= 4 ? y : y - 1;
+                const isCurrentFiscal = fiscalYear >= 2025;
+                return (
+                  <div style={{
+                    marginTop: 8, padding: "8px 12px",
+                    borderRadius: 8,
+                    background: isCurrentFiscal ? "rgba(10,132,255,0.08)" : "rgba(255,159,10,0.08)",
+                    fontSize: 11,
+                    color: isCurrentFiscal ? C.blue : C.orange,
+                  }}>
+                    {isCurrentFiscal
+                      ? `令和${fiscalYear - 2018}（${fiscalYear}）年度の料率を適用中（令和8年度 ${RATE_YEAR} データ）`
+                      : `入社月が1〜3月のため、令和${fiscalYear - 2018}（${fiscalYear}）年度料率が適用されます。現在は令和8年度データで概算しています。`
+                    }
+                  </div>
+                );
+              })()}
+            </div>
+
             {/* 手順 */}
             <div style={{
               fontSize: 12, color: C.labelSecond,
@@ -1331,6 +1386,7 @@ export default function App() {
             ["厚生年金", "18.30%（折半）"],
             ["雇用保険", "0.50%（本人）"],
             ["介護保険", "1.62%（折半・40歳以上）"],
+            ...(joinYM ? [["入社想定", `${joinYM.replace("-", "年")}月`]] : []),
           ].map(([k, v]) => (
             <span key={k} style={{ fontSize: 11, color: C.formSecond }}>
               <span style={{ color: C.gray }}>{k}: </span>{v}
