@@ -1748,6 +1748,80 @@ export default function App() {
         </div>
       )}
 
+      {/* 転職サービス CTA（候補者モード・結果表示時のみ） */}
+      {result && mode === "candidate" && (
+        <div style={{ maxWidth: 680, margin: "32px auto 0", padding: "0 16px" }}>
+          <div style={{
+            borderRadius: 16,
+            border: `1px solid ${C.separator}`,
+            background: C.surface,
+            padding: isMobile ? "20px 18px" : "24px 28px",
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: C.labelSecond, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 }}>
+              転職・キャリア相談
+            </div>
+            <p style={{ fontSize: 13, color: C.labelSecond, margin: "0 0 18px", lineHeight: 1.6 }}>
+              社宅条件が気になる方は、エージェントに条件交渉を相談するのも一つの手です。
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {[
+                {
+                  name: "リクルートエージェント",
+                  desc: "国内最大級の求人数。年収・待遇交渉サポートあり",
+                  url: "https://www.r-agent.com/",  /* ← A8.netのアフィリエイトURLに差し替えてください */
+                  color: "#003087",
+                },
+                {
+                  name: "doda",
+                  desc: "転職サイト＆エージェント一体型。福利厚生条件も詳しく確認できる",
+                  url: "https://doda.jp/",  /* ← A8.netのアフィリエイトURLに差し替えてください */
+                  color: "#00A0E9",
+                },
+                {
+                  name: "マイナビ転職",
+                  desc: "社宅・住宅手当ありの求人を絞り込み検索できる",
+                  url: "https://tenshoku.mynavi.jp/",  /* ← A8.netのアフィリエイトURLに差し替えてください */
+                  color: "#E60012",
+                },
+              ].map(({ name, desc, url, color }) => (
+                <a
+                  key={name}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer sponsored"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 14,
+                    padding: "12px 16px",
+                    borderRadius: 10,
+                    border: `1px solid ${C.separator}`,
+                    background: C.surface2,
+                    textDecoration: "none",
+                    transition: "border-color 0.15s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = color}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = C.separator}
+                >
+                  <div style={{
+                    width: 6, height: 36, borderRadius: 3,
+                    background: color, flexShrink: 0,
+                  }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.labelPrimary, marginBottom: 2 }}>{name}</div>
+                    <div style={{ fontSize: 11, color: C.labelSecond, lineHeight: 1.5 }}>{desc}</div>
+                  </div>
+                  <div style={{ fontSize: 11, color: C.blue, fontWeight: 600, flexShrink: 0 }}>詳しく見る →</div>
+                </a>
+              ))}
+            </div>
+            <div style={{ marginTop: 12, fontSize: 10, color: C.gray, textAlign: "right" }}>
+              ※ 広告・PR
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 利用マニュアル */}
       <div style={{ maxWidth: 680, margin: "48px auto 0" }}>
         <div style={{
