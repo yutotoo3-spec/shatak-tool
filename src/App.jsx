@@ -1554,6 +1554,49 @@ export default function App() {
             </button>
           </div>
 
+          {/* SNS シェア（候補者モードのみ） */}
+          {mode === "candidate" && (
+            <div style={{
+              display: "flex", gap: 10, marginBottom: 14,
+              flexDirection: isMobile ? "column" : "row",
+            }}>
+              <button
+                onClick={() => {
+                  const sign = diff >= 0 ? "+" : "";
+                  const text = encodeURIComponent(
+                    `社宅条件をシミュレーションしました。社宅あり/なしの手取り差額は年間${sign}${yen2(diff)}。\n#転職 #社宅シミュレーター`
+                  );
+                  const url = encodeURIComponent(buildShareURL());
+                  window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, "_blank", "noopener,noreferrer");
+                }}
+                style={{
+                  flex: 1, padding: isMobile ? "14px" : "12px",
+                  borderRadius: 10, background: "#000", color: "#fff",
+                  fontWeight: 500, fontSize: isMobile ? 14 : 13,
+                  border: "none", cursor: "pointer", fontFamily: "inherit",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                X（旧Twitter）でシェア
+              </button>
+              <button
+                onClick={() => {
+                  const url = encodeURIComponent(buildShareURL());
+                  window.open(`https://social-plugins.line.me/lineit/share?url=${url}`, "_blank", "noopener,noreferrer");
+                }}
+                style={{
+                  flex: 1, padding: isMobile ? "14px" : "12px",
+                  borderRadius: 10, background: "#06C755", color: "#fff",
+                  fontWeight: 500, fontSize: isMobile ? 14 : 13,
+                  border: "none", cursor: "pointer", fontFamily: "inherit",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                LINE でシェア
+              </button>
+            </div>
+          )}
+
           {/* 凡例 */}
           <div style={{
             display: "flex", justifyContent: "center",
