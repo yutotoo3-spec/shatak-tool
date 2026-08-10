@@ -1301,6 +1301,9 @@ export default function App() {
                 <option key={p} value={p}>{p}　（{KENPO_RATES[p]}%）</option>
               ))}
             </select>
+            <div style={{ marginTop: 6, fontSize: 11, color: C.gray }}>
+              （　）内は協会けんぽの健康保険料率（被保険者負担分）です
+            </div>
           </div>
 
           {/* 賞与月数 */}
@@ -1318,6 +1321,9 @@ export default function App() {
                   {n}
                 </SegBtn>
               ))}
+            </div>
+            <div style={{ marginTop: 6, fontSize: 11, color: C.gray }}>
+              年間賞与を「月給の何ヶ月分」で入力（例：夏冬計3ヶ月分なら「3」）
             </div>
           </div>
 
