@@ -662,6 +662,9 @@ const PatternCard = ({ title, isRecommended, data, coRatio, isMobile }) => (
   </div>
 );
 
+// 他ページ（規程準拠モード等）とデザインシステムを共有するための再エクスポート
+export { C, SectionLabel, Badge, Row, FormRow, NumInput, SegBtn, yen };
+
 // ─────────────────────────────────────────────────────────────
 // メインアプリ
 // ─────────────────────────────────────────────────────────────
@@ -950,16 +953,23 @@ export default function App() {
           <div style={{
             padding: "14px 20px",
             borderBottom: `1px solid ${C.separator}`,
-            display: "flex", alignItems: "center", gap: 10,
           }}>
-            <div style={{
-              width: 6, height: 6, borderRadius: "50%",
-              background: C.blue,
-            }} />
-            <div style={{ color: C.labelPrimary, fontSize: 14, fontWeight: 600 }}>HR 設定モード</div>
-            <div style={{ color: C.labelSecond, fontSize: 12, marginLeft: 4 }}>
-              候補者の情報を入力し、共有 URL を生成して送付してください
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{
+                width: 6, height: 6, borderRadius: "50%",
+                background: C.blue,
+              }} />
+              <div style={{ color: C.labelPrimary, fontSize: 14, fontWeight: 600 }}>HR 設定モード</div>
+              <div style={{ color: C.labelSecond, fontSize: 12, marginLeft: 4 }}>
+                候補者の情報を入力し、共有 URL を生成して送付してください
+              </div>
             </div>
+            <a href="/kitei" target="_blank" rel="noopener noreferrer" style={{
+              display: "inline-block", marginTop: 8, marginLeft: 16,
+              fontSize: 12, color: C.blue, textDecoration: "none",
+            }}>
+              規程準拠の正式計算はこちら →
+            </a>
           </div>
           <div style={{ padding: "16px 20px" }}>
 
