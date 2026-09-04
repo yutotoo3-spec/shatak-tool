@@ -662,6 +662,9 @@ const PatternCard = ({ title, isRecommended, data, coRatio, isMobile }) => (
   </div>
 );
 
+// 他ページ（規程準拠モード等）とデザインシステムを共有するための再エクスポート
+export { C, SectionLabel, Badge, Row, FormRow, NumInput, SegBtn, yen };
+
 // ─────────────────────────────────────────────────────────────
 // メインアプリ
 // ─────────────────────────────────────────────────────────────
@@ -950,15 +953,57 @@ export default function App() {
           <div style={{
             padding: "14px 20px",
             borderBottom: `1px solid ${C.separator}`,
-            display: "flex", alignItems: "center", gap: 10,
           }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{
+                width: 6, height: 6, borderRadius: "50%",
+                background: C.blue,
+              }} />
+              <div style={{ color: C.labelPrimary, fontSize: 14, fontWeight: 600 }}>HR 設定モード</div>
+              <div style={{ color: C.labelSecond, fontSize: 12, marginLeft: 4 }}>
+                候補者の情報を入力し、共有 URL を生成して送付してください
+              </div>
+            </div>
+          </div>
+
+          {/* 計算方法の選択: 概算（このツール） / 規定通り（規程準拠ツール） */}
+          <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.separator}` }}>
             <div style={{
-              width: 6, height: 6, borderRadius: "50%",
-              background: C.blue,
-            }} />
-            <div style={{ color: C.labelPrimary, fontSize: 14, fontWeight: 600 }}>HR 設定モード</div>
-            <div style={{ color: C.labelSecond, fontSize: 12, marginLeft: 4 }}>
-              候補者の情報を入力し、共有 URL を生成して送付してください
+              fontSize: 11, fontWeight: 600, color: C.labelSecond,
+              letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 10,
+            }}>
+              計算方法を選択
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
+              <div style={{
+                flex: 1, minWidth: isMobile ? "100%" : 0,
+                border: `1px solid ${C.blue}`, borderRadius: 12, padding: "14px 16px",
+                background: "rgba(10,132,255,0.1)",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.labelPrimary }}>概算</span>
+                  <span style={{
+                    fontSize: 10, fontWeight: 600, color: C.blue,
+                    background: "rgba(10,132,255,0.15)", padding: "2px 6px", borderRadius: 4,
+                  }}>このページ</span>
+                </div>
+                <div style={{ fontSize: 11, color: C.labelSecond, lineHeight: 1.5 }}>
+                  家賃×70%固定でオファー比較・節税試算を行います。候補者への提示・比較用。
+                </div>
+              </div>
+              <a href="/kitei" style={{
+                flex: 1, minWidth: isMobile ? "100%" : 0, textDecoration: "none", display: "block",
+                border: `1px solid ${C.separator}`, borderRadius: 12, padding: "14px 16px",
+                background: C.surface2,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.labelPrimary }}>規定通り</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: C.labelSecond }}>開く →</span>
+                </div>
+                <div style={{ fontSize: 11, color: C.labelSecond, lineHeight: 1.5 }}>
+                  借上社宅管理規程（第9条・第11条）に基づく正式な会社負担・本人負担を算出します。
+                </div>
+              </a>
             </div>
           </div>
           <div style={{ padding: "16px 20px" }}>
