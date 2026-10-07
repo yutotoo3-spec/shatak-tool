@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { C, SectionLabel, Row, NumInput, SegBtn } from "./App.jsx";
+import { C } from "./theme.js";
+import { SectionLabel, Row, NumInput, SegBtn } from "./components/primitives.jsx";
 
 // ─────────────────────────────────────────────────────────────
 // 借上社宅管理規程 第9条・第11条 準拠の計算ロジック

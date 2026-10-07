@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { kyuyoKojo, kisoKojoTokurei, kisoKojoShotoku, calcShotoku, calcJumin } from "./App.jsx";
+import { kyuyoKojo, kisoKojoTokurei, kisoKojoShotoku, calcShotoku, calcJumin } from "./calc.js";
 
 describe("kyuyoKojo（給与所得控除・令和7年度税制改正対応）", () => {
   it("190万円以下は一律65万円", () => {
