@@ -500,7 +500,7 @@ const CompareChart = ({ no, yes, isMobile }) => {
 };
 
 // ── 理論年収・年間負担内訳テーブル
-const CostSummaryTable = ({ no, yes, nenshu, coRatio, isMobile }) => {
+const CostSummaryTable = ({ no, yes, nenshu, isMobile }) => {
   // 理論年収（提示年収）= 借上社宅の会社負担分を含まない純粋な給与オファー額
   const totalNenshu = nenshu * 10000;
   const noPersonal  = no.annual_yachin + no.annual_shakai + no.annual_shotoku + no.annual_jumin;
@@ -811,7 +811,9 @@ export default function App() {
       if (p.get("jm")) setJoinYM(p.get("jm"));
       setRan(true);
       setMode("candidate");
-    } catch {}
+    } catch {
+      // 共有URLのハッシュが不正な形式の場合は無視し、通常の初期表示にフォールバックする
+    }
   }, []);
 
   const kenpoRate = useMemo(() => {
@@ -1632,7 +1634,7 @@ export default function App() {
           {/* 理論年収・年間負担内訳 */}
           <CostSummaryTable
             no={result.no} yes={result.yes}
-            nenshu={nenshu} coRatio={coRatio}
+            nenshu={nenshu}
             isMobile={isMobile}
           />
 
