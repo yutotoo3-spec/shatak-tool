@@ -16,16 +16,23 @@ const calcLimits = (kihonkyu, taido) => {
 };
 
 // 実賃料が決まった段階での会社負担・本人負担の算出
+// 会社負担70%／本人負担30%は借上社宅管理規程 第9条に定める確定値であり、設定変更はできない。
+// （概算ツール側のHR設定モードで選べる「社宅会社負担割合（50〜100%）」は、オファー比較のシナリオ
+// 検討用の仮の値であり、この規程準拠ツールとは目的が異なる。社内規程の値そのものが変更された場合は
+// この70%の定数を更新すること）
+const KITEI_COMPANY_RATIO = 0.7;
+const companyPct = Math.round(KITEI_COMPANY_RATIO * 100);
+const personalPct = 100 - companyPct;
 const calcKitei = (kihonkyu, taido, chinryo) => {
   const { genzai, warnThreshold } = calcLimits(kihonkyu, taido);
   const isOver = chinryo > genzai;
 
   let company, personal;
   if (!isOver) {
-    company = Math.floor(chinryo * 0.7);
+    company = Math.floor(chinryo * KITEI_COMPANY_RATIO);
     personal = chinryo - company;
   } else {
-    company = Math.floor(genzai * 0.7);
+    company = Math.floor(genzai * KITEI_COMPANY_RATIO);
     const personalWithinLimit = genzai - company;
     personal = personalWithinLimit + (chinryo - genzai);
   }
@@ -100,7 +107,7 @@ export default function KiteiApp() {
       baseLine,
       `帯同区分　　　　: ${taidoLabel}`,
       "",
-      `補助対象限度額　: ${yen(limits.genzai)}（家賃がこれ以下なら会社70%／本人30%）`,
+      `補助対象限度額　: ${yen(limits.genzai)}（家賃がこれ以下なら会社${companyPct}%／本人${personalPct}%）`,
       `提供可能な家賃上限（目安）: ${yen(limits.warnThreshold)}（これを超えると規程上、要相談）`,
     ];
     if (result) {
@@ -150,6 +157,10 @@ export default function KiteiApp() {
         <div style={{ color: C.labelSecond, fontSize: 13 }}>
           借上社宅管理規程 第9条・第11条に基づく正式な会社負担・本人負担の算出（社内用）
         </div>
+        <div style={{ color: C.labelThird, fontSize: 11, marginTop: 8, lineHeight: 1.6 }}>
+          会社負担{companyPct}%／本人負担{personalPct}%は社内規程に定める確定値で、変更できません。
+          概算ツール（候補者モード・HR設定モード）の「社宅会社負担割合」はオファー比較のシナリオ検討用の仮の値で、この規程準拠ツールの値とは別の目的で使用します。
+        </div>
       </div>
 
       {/* STEP1: 基本給の算出 */}
@@ -174,8 +185,10 @@ export default function KiteiApp() {
         {inputMode === "nenshu" ? (
           <>
             <div style={{ marginBottom: 18 }}>
-              <div style={inputLabelStyle}>理論年収（社宅なしで確定した金額・万円）</div>
+              <label htmlFor="input-nenshu-man" style={inputLabelStyle}>理論年収（社宅なしで確定した金額・万円）</label>
               <NumInput
+                id="input-nenshu-man"
+                label="理論年収"
                 val={nenshuMan}
                 setter={(fn) => { setNenshuMan(fn); setRan(false); }}
                 min={0} max={5000} step={10}
@@ -183,8 +196,8 @@ export default function KiteiApp() {
               />
             </div>
             <div style={{ marginBottom: 18 }}>
-              <div style={inputLabelStyle}>賞与月数</div>
-              <div style={{
+              <div id="label-bonus-months" style={inputLabelStyle}>賞与月数</div>
+              <div role="group" aria-labelledby="label-bonus-months" style={{
                 display: "flex", gap: 4, background: C.formSurface,
                 borderRadius: 10, padding: 3,
               }}>
@@ -204,8 +217,10 @@ export default function KiteiApp() {
           </>
         ) : (
           <div style={{ marginBottom: 4 }}>
-            <div style={inputLabelStyle}>基本給（月額・円）</div>
+            <label htmlFor="input-kihonkyu-direct" style={inputLabelStyle}>基本給（月額・円）</label>
             <NumInput
+              id="input-kihonkyu-direct"
+              label="基本給"
               val={kihonkyuDirect}
               setter={(fn) => { setKihonkyuDirect(fn); setRan(false); }}
               min={0} max={5000000} step={1000}
@@ -215,8 +230,8 @@ export default function KiteiApp() {
         )}
 
         <div style={{ margin: "18px 0" }}>
-          <div style={inputLabelStyle}>帯同区分</div>
-          <div style={{
+          <div id="label-taido" style={inputLabelStyle}>帯同区分</div>
+          <div role="group" aria-labelledby="label-taido" style={{
             display: "flex", padding: 3, borderRadius: 10,
             background: C.formSurface, gap: 2,
           }}>
@@ -251,10 +266,10 @@ export default function KiteiApp() {
           border: `1px solid ${C.separator}`,
         }}>
           <SectionLabel>STEP 2　会社制度で支払える家賃の目安</SectionLabel>
-          <Row label="70%／30%で会社負担できる上限" value={yen(limits.genzai)} bold green />
+          <Row label={`会社${companyPct}%／本人${personalPct}%で会社負担できる上限`} value={yen(limits.genzai)} bold green />
           <Row label="超過ケースとして提供可能な上限（要相談ライン）" value={yen(limits.warnThreshold)} bold />
           <div style={{ fontSize: 11, color: C.gray, marginTop: 10, lineHeight: 1.6 }}>
-            家賃が {yen(limits.genzai)} 以下なら会社70% / 本人30%の通常ケース。
+            家賃が {yen(limits.genzai)} 以下なら会社{companyPct}% / 本人{personalPct}%の通常ケース。
             それを超えても {yen(limits.warnThreshold)} までは超過ケースとして提供可能ですが、本人負担が増えます。
             {yen(limits.warnThreshold)} を超える物件は、規程上、会社が提供を断ることができます。
           </div>
@@ -269,8 +284,10 @@ export default function KiteiApp() {
         }}>
           <SectionLabel light>STEP 3　物件が決まったら実賃料で試算（任意）</SectionLabel>
           <div style={{ marginBottom: 14 }}>
-            <div style={inputLabelStyle}>実賃料（家賃＋共益費＋管理費・円／仮設定でも可）</div>
+            <label htmlFor="input-chinryo" style={inputLabelStyle}>実賃料（家賃＋共益費＋管理費・円／仮設定でも可）</label>
             <NumInput
+              id="input-chinryo"
+              label="実賃料"
               val={chinryo}
               setter={(fn) => { setChinryo(fn); setRan(false); }}
               min={0} max={2000000} step={1000}
@@ -366,12 +383,12 @@ export default function KiteiApp() {
                   value={`実賃料 ${yen(chinryo)} ${result.isOver ? ">" : "≤"} 限度額 ${yen(result.genzai)}`} muted />
                 {!result.isOver ? (
                   <>
-                    <Row label="④ 会社負担" value={`実賃料 × 70% = ${yen(result.company)}`} muted />
+                    <Row label="④ 会社負担" value={`実賃料 × ${companyPct}% = ${yen(result.company)}`} muted />
                     <Row label="④ 本人負担" value={`実賃料 − 会社負担 = ${yen(result.personal)}`} muted />
                   </>
                 ) : (
                   <>
-                    <Row label="④ 会社負担" value={`限度額 × 70% = ${yen(result.company)}`} muted />
+                    <Row label="④ 会社負担" value={`限度額 × ${companyPct}% = ${yen(result.company)}`} muted />
                     <Row label="④ 本人負担"
                       value={`(限度額 − 会社負担) + (実賃料 − 限度額) = ${yen(result.personal)}`} muted />
                   </>

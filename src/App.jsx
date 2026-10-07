@@ -45,6 +45,7 @@ const KUMIAI_PRESETS = [
 // ─────────────────────────────────────────────────────────────
 // 計算ロジック
 // ─────────────────────────────────────────────────────────────
+// 厚生年金保険の標準報酬月額（32等級・上限65万円）
 const HYOJUN_TABLE = [
   [88000,93000],[98000,101000],[104000,107000],[110000,114000],
   [118000,122000],[126000,130000],[134000,138000],[142000,146000],
@@ -59,13 +60,56 @@ const getHyojun = (m) => {
   for (const [h, u] of HYOJUN_TABLE) if (m < u) return h;
   return 650000;
 };
+
+// 健康保険・介護保険の標準報酬月額（50等級・上限139万円）
+// 厚生年金より等級数が多く上限も高いため、別テーブルとして保持する
+// 出典: 健康保険法（平成28年4月1日改正で48〜50等級を追加）
+const KENPO_HYOJUN_TABLE = [
+  [58000,63000],[68000,73000],[78000,83000],
+  [88000,93000],[98000,101000],[104000,107000],[110000,114000],
+  [118000,122000],[126000,130000],[134000,138000],[142000,146000],
+  [150000,155000],[160000,165000],[170000,175000],[180000,185000],
+  [190000,195000],[200000,210000],[220000,230000],[240000,250000],
+  [260000,270000],[280000,290000],[300000,310000],[320000,330000],
+  [340000,350000],[360000,370000],[380000,395000],[410000,425000],
+  [440000,455000],[470000,485000],[500000,515000],[530000,545000],
+  [560000,575000],[590000,605000],[620000,635000],[650000,665000],
+  [680000,695000],[710000,730000],[750000,770000],[790000,810000],
+  [830000,855000],[880000,905000],[930000,955000],[980000,1005000],
+  [1030000,1055000],[1090000,1115000],[1150000,1175000],[1210000,1235000],
+  [1270000,1295000],[1330000,1355000],[1390000,Infinity],
+];
+const getKenpoHyojun = (m) => {
+  for (const [h, u] of KENPO_HYOJUN_TABLE) if (m < u) return h;
+  return 1390000;
+};
+// 給与所得控除（令和7年度税制改正で最低保証額55万円→65万円・適用上限1,625,000円→1,900,000円に変更。
+// 国税庁「令和7年分の年末調整のしかた」速算表に準拠。所得税・住民税の両方で共通して使う給与所得の算出に使用）
 const kyuyoKojo = (y) => {
-  if (y <= 1625000) return 550000;
-  if (y <= 1800000) return y * 0.4 - 100000;
+  if (y <= 1900000) return 650000;
   if (y <= 3600000) return y * 0.3 + 80000;
   if (y <= 6600000) return y * 0.2 + 440000;
   if (y <= 8500000) return y * 0.1 + 1100000;
   return 1950000;
+};
+// 所得税の基礎控除（令和7年度税制改正）
+// ベースは48万円→58万円に恒久的に引き上げ。さらに令和7・8年分（2025・2026年）に限り、
+// 給与所得（合計所得金額相当）に応じて最大37万円を上乗せする時限措置が設けられている。
+// 令和9年分以降は上乗せ特例が終了するため、その時点で baseKisoKojo の分岐は見直しが必要。
+// 合計所得2,400万円超の段階的減少・消失ルールは本措置以前から存在する恒久ルール。
+// 出典: 国税庁「令和7年度税制改正による所得税の基礎控除の見直し」
+const kisoKojoTokurei = (shotokuGaku) => {
+  if (shotokuGaku <= 1320000) return 370000;
+  if (shotokuGaku <= 3360000) return 300000;
+  if (shotokuGaku <= 4890000) return 100000;
+  if (shotokuGaku <= 6550000) return 50000;
+  return 0;
+};
+const kisoKojoShotoku = (shotokuGaku) => {
+  if (shotokuGaku > 25000000) return 0;
+  if (shotokuGaku > 24500000) return 160000;
+  if (shotokuGaku > 24000000) return 320000;
+  return 580000 + kisoKojoTokurei(shotokuGaku);
 };
 const calcShotoku = (k) => {
   if (k <= 0) return 0;
@@ -78,21 +122,34 @@ const calcShotoku = (k) => {
   else t = k * 0.4 - 2796000;
   return Math.floor(t * 1.021);
 };
+// 住民税の基礎控除（43万円）は所得税と異なり令和7年度税制改正の対象外で変更なし。
+// ただし給与所得控除（kyuyoKojo）の見直しは住民税にも共通して適用される。
 const calcJumin = (nenshu, shakai, dep) => {
   const s = nenshu - kyuyoKojo(nenshu);
   return Math.floor(Math.max(0, s - shakai - 430000 - 330000 * dep) * 0.1 + 5000);
 };
 
+// ─────────────────────────────────────────────────────────────
+// その他の社会保険料率（被保険者負担分・年度更新が必要な値）
+// ・厚生年金保険料率 18.30%（折半9.15%）: 平成29年9月以降固定。法律上の上限のため年度改定なし。
+//   出典: 日本年金機構 https://www.nenkin.go.jp/service/kounen/hokenryo/ryogaku/index.html
+// ・介護保険料率（第2号被保険者）1.62%（折半0.81%）: 令和8年度・協会けんぽ全国一律。
+//   出典: https://www.kyoukaikenpo.or.jp/file/202510200923.pdf
+// ・雇用保険料率 0.50%（被保険者負担・一般事業）: 令和8年度（令和8年4月〜令和9年3月）。
+//   農林水産・清酒製造業・建設業は被保険者負担0.60%と異なるため、本ツールは一般事業を前提とする。
+//   出典: https://jsite.mhlw.go.jp/yamanashi-roudoukyoku/koyouhoken_R8.html
+// ─────────────────────────────────────────────────────────────
 const calcPattern = (nenshu, yachin, age, dep, withShatak, kenpoRate, bonusMonths, coRatio) => {
   const coR = coRatio / 100;
   const teiji = withShatak ? nenshu - yachin * coR * 12 : nenshu;
   const monthly = teiji / (12 + bonusMonths);
   const annualBonus = monthly * bonusMonths;
-  const h = getHyojun(monthly);
-  const kenpo = Math.round(h * kenpoRate);
-  const kaigo = age >= 40 ? Math.round(h * 0.0081) : 0;
-  const kosei = Math.round(h * 0.0915);
-  const koyo  = Math.round(monthly * 0.0050);
+  const h = getHyojun(monthly);           // 厚生年金用（上限65万円）
+  const hKenpo = getKenpoHyojun(monthly); // 健康保険・介護保険用（上限139万円）
+  const kenpo = Math.round(hKenpo * kenpoRate);
+  const kaigo = age >= 40 ? Math.round(hKenpo * 0.0081) : 0;  // 介護保険0.81%（折半）
+  const kosei = Math.round(h * 0.0915);                       // 厚生年金9.15%（折半）
+  const koyo  = Math.round(monthly * 0.0050);                 // 雇用保険0.50%（被保険者・一般事業）
   const monthly_shakai = kenpo + kaigo + kosei + koyo;
   const bh = Math.floor(annualBonus / 1000) * 1000;
   const bonus_shakai =
@@ -101,7 +158,8 @@ const calcPattern = (nenshu, yachin, age, dep, withShatak, kenpoRate, bonusMonth
     Math.round(Math.min(bh, 1500000) * 0.0915) +
     Math.round(annualBonus * 0.0050);
   const annual_shakai = monthly_shakai * 12 + bonus_shakai;
-  const kazei = Math.max(0, teiji - kyuyoKojo(teiji) - annual_shakai - 480000 - 380000 * dep);
+  const shotokuGaku = teiji - kyuyoKojo(teiji); // 給与所得（基礎控除の判定にも使用）
+  const kazei = Math.max(0, shotokuGaku - annual_shakai - kisoKojoShotoku(shotokuGaku) - 380000 * dep);
   const annual_shotoku = calcShotoku(kazei);
   const annual_jumin   = calcJumin(teiji, annual_shakai, dep);
   const selfYachin    = withShatak ? Math.round(yachin * (1 - coR)) : yachin;
@@ -111,7 +169,7 @@ const calcPattern = (nenshu, yachin, age, dep, withShatak, kenpoRate, bonusMonth
   const m_shotoku = Math.round(annual_shotoku / 12);
   const m_jumin   = Math.round(annual_jumin / 12);
   const m_tedori  = Math.round(annual_tedori / 12);
-  const co_shakai = Math.round(h * kenpoRate) + (age >= 40 ? Math.round(h * 0.0081) : 0)
+  const co_shakai = Math.round(hKenpo * kenpoRate) + (age >= 40 ? Math.round(hKenpo * 0.0081) : 0)
     + Math.round(h * 0.0915) + Math.round(monthly * 0.0085);
   const co_yachin = withShatak ? Math.round(yachin * coR) : 0;
   return {
@@ -129,6 +187,11 @@ const calcPattern = (nenshu, yachin, age, dep, withShatak, kenpoRate, bonusMonth
 const yen  = (v) => Math.abs(v) >= 10000 ? `${(v / 10000).toFixed(1)}万円` : `${Math.round(v).toLocaleString()}円`;
 const yen2 = (v) => `${Math.round(v / 10000).toLocaleString()}万円`;
 const man  = (v) => +(v / 10000).toFixed(1);
+// 数値をmin〜maxにクランプする。不正な値（NaN等）の場合はnullを返す
+const clampOrNull = (v, min, max) => {
+  const n = +v;
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : null;
+};
 
 // ─────────────────────────────────────────────────────────────
 // Apple Design System カラー定数
@@ -232,50 +295,68 @@ const Row = ({ label, value, approx, bold, muted, green }) => (
 );
 
 // +/- 数値入力（フォーム用）
-const NumInput = ({ val, setter, min, max, step = 1, onDone, isMobile }) => (
-  <div style={{
-    display: "flex", alignItems: "center",
-    border: `1px solid ${C.formBorder}`,
-    borderRadius: 10, overflow: "hidden",
-    background: C.formSurface,
-  }}>
-    <button
-      onClick={() => { setter(v => +(Math.max(min, +v - step).toFixed(2))); onDone(); }}
-      style={{
-        padding: isMobile ? "13px 18px" : "10px 16px",
-        background: "none", border: "none",
-        fontSize: 18, color: C.blue, cursor: "pointer",
-        borderRight: `1px solid ${C.formBorder}`,
-        lineHeight: 1, fontFamily: "inherit", fontWeight: 300,
-      }}>−</button>
-    <input
-      type="number" value={val}
-      onChange={e => { setter(+e.target.value); onDone(); }}
-      style={{
-        flex: 1, padding: isMobile ? "13px 4px" : "10px 4px",
-        border: "none", background: "transparent",
-        textAlign: "center",
-        fontSize: isMobile ? 16 : 14,
-        color: C.formLabel, outline: "none",
-        fontFamily: "inherit", fontWeight: 500,
-      }}
-      min={min} max={max} step={step}
-    />
-    <button
-      onClick={() => { setter(v => +(Math.min(max, +v + step).toFixed(2))); onDone(); }}
-      style={{
-        padding: isMobile ? "13px 18px" : "10px 16px",
-        background: "none", border: "none",
-        fontSize: 18, color: C.blue, cursor: "pointer",
-        borderLeft: `1px solid ${C.formBorder}`,
-        lineHeight: 1, fontFamily: "inherit", fontWeight: 300,
-      }}>＋</button>
-  </div>
-);
+// 入力中（onChange）は自由に打てるようにし、確定時（onBlur）にmin〜maxへクランプ・NaNガードする
+const NumInput = ({ val, setter, min, max, step = 1, onDone, isMobile, label, id }) => {
+  const clamp = (v) => Math.min(max, Math.max(min, v));
+  return (
+    <div style={{
+      display: "flex", alignItems: "center",
+      border: `1px solid ${C.formBorder}`,
+      borderRadius: 10, overflow: "hidden",
+      background: C.formSurface,
+    }}>
+      <button
+        type="button"
+        aria-label={label ? `${label}を減らす` : "減らす"}
+        onClick={() => { setter(v => +(clamp(+v - step).toFixed(2))); onDone(); }}
+        style={{
+          padding: isMobile ? "13px 18px" : "10px 16px",
+          background: "none", border: "none",
+          fontSize: 18, color: C.blue, cursor: "pointer",
+          borderRight: `1px solid ${C.formBorder}`,
+          lineHeight: 1, fontFamily: "inherit", fontWeight: 300,
+        }}>−</button>
+      <input
+        id={id}
+        aria-label={label}
+        type="number" value={val}
+        onChange={e => {
+          const n = +e.target.value;
+          if (Number.isFinite(n)) { setter(n); onDone(); }
+        }}
+        onBlur={e => {
+          const n = +e.target.value;
+          setter(Number.isFinite(n) ? clamp(n) : min);
+          onDone();
+        }}
+        style={{
+          flex: 1, padding: isMobile ? "13px 4px" : "10px 4px",
+          border: "none", background: "transparent",
+          textAlign: "center",
+          fontSize: isMobile ? 16 : 14,
+          color: C.formLabel, outline: "none",
+          fontFamily: "inherit", fontWeight: 500,
+        }}
+        min={min} max={max} step={step}
+      />
+      <button
+        type="button"
+        aria-label={label ? `${label}を増やす` : "増やす"}
+        onClick={() => { setter(v => +(clamp(+v + step).toFixed(2))); onDone(); }}
+        style={{
+          padding: isMobile ? "13px 18px" : "10px 16px",
+          background: "none", border: "none",
+          fontSize: 18, color: C.blue, cursor: "pointer",
+          borderLeft: `1px solid ${C.formBorder}`,
+          lineHeight: 1, fontFamily: "inherit", fontWeight: 300,
+        }}>＋</button>
+    </div>
+  );
+};
 
 // セグメントコントロール風ボタングループ
 const SegBtn = ({ active, onClick, children, isMobile }) => (
-  <button onClick={onClick} style={{
+  <button type="button" onClick={onClick} aria-pressed={active} style={{
     flex: 1,
     padding: isMobile ? "10px 0" : "8px 0",
     border: "none", borderRadius: 7, cursor: "pointer",
@@ -698,16 +779,23 @@ export default function App() {
     if (!hash) return;
     try {
       const p = new URLSearchParams(hash);
-      if (p.get("n")) setNenshu(+p.get("n"));
-      if (p.get("y")) setYachin(+p.get("y"));
-      if (p.get("a")) setAge(+p.get("a"));
-      if (p.get("d")) setDep(+p.get("d"));
+      const n = clampOrNull(p.get("n"), 100, 3000);
+      if (n !== null) setNenshu(n);
+      const y = clampOrNull(p.get("y"), 1, 100);
+      if (y !== null) setYachin(y);
+      const a = clampOrNull(p.get("a"), 18, 70);
+      if (a !== null) setAge(a);
+      const d = clampOrNull(p.get("d"), 0, 10);
+      if (d !== null) setDep(d);
       if (p.get("p") && KENPO_RATES[p.get("p")]) setPref(p.get("p"));
-      if (p.get("b") != null) setBonus(+p.get("b"));
-      if (p.get("r")) setCoRatio(Math.min(100, Math.max(50, +p.get("r"))));
+      const b = clampOrNull(p.get("b"), 0, 12);
+      if (b !== null) setBonus(b);
+      const r = clampOrNull(p.get("r"), 50, 100);
+      if (r !== null) setCoRatio(r);
       if (p.get("it") === "kumiai") {
         setInsuranceType("kumiai");
-        if (p.get("kr")) setCustomKenpoRate(Math.min(15, Math.max(1, +p.get("kr"))));
+        const kr = clampOrNull(p.get("kr"), 1, 15);
+        if (kr !== null) setCustomKenpoRate(kr);
       }
       if (p.get("jm")) setJoinYM(p.get("jm"));
       setRan(true);
@@ -988,7 +1076,7 @@ export default function App() {
                   }}>このページ</span>
                 </div>
                 <div style={{ fontSize: 11, color: C.labelSecond, lineHeight: 1.5 }}>
-                  家賃×70%固定でオファー比較・節税試算を行います。候補者への提示・比較用。
+                  家賃の会社負担割合（50〜100%、既定70%・下で設定可能）でオファー比較・節税試算を行うシナリオ検討用の仮の値です。社内規程の確定値ではありません。
                 </div>
               </div>
               <a href="/kitei" style={{
@@ -1001,7 +1089,7 @@ export default function App() {
                   <span style={{ fontSize: 10, fontWeight: 600, color: C.labelSecond }}>開く →</span>
                 </div>
                 <div style={{ fontSize: 11, color: C.labelSecond, lineHeight: 1.5 }}>
-                  借上社宅管理規程（第9条・第11条）に基づく正式な会社負担・本人負担を算出します。
+                  借上社宅管理規程（第9条・第11条）に基づく正式な会社負担・本人負担を算出します（会社負担70%で固定）。
                 </div>
               </a>
             </div>
@@ -1021,7 +1109,7 @@ export default function App() {
                 gap: 2, marginBottom: 14,
               }}>
                 {[["kyokai", "協会けんぽ"], ["kumiai", "健保組合・共済"]].map(([t, label]) => (
-                  <button key={t} onClick={() => { setInsuranceType(t); resetRan(); }} style={{
+                  <button key={t} type="button" aria-pressed={insuranceType === t} onClick={() => { setInsuranceType(t); resetRan(); }} style={{
                     padding: "7px 16px",
                     border: "none", borderRadius: 8, cursor: "pointer",
                     fontFamily: "inherit", fontSize: 13,
@@ -1047,6 +1135,7 @@ export default function App() {
                   }}>
                     <div style={{ flex: "1 1 180px" }}>
                       <select
+                        aria-label="都道府県"
                         value={pref}
                         onChange={e => { setPref(e.target.value); resetRan(); }}
                         style={{
@@ -1094,6 +1183,8 @@ export default function App() {
                     {KUMIAI_PRESETS.map(p => (
                       <button
                         key={p.name}
+                        type="button"
+                        aria-pressed={Math.abs(customKenpoRate - p.rate) < 0.01}
                         onClick={() => { setCustomKenpoRate(p.rate); resetRan(); }}
                         style={{
                           padding: "10px 14px",
@@ -1133,9 +1224,9 @@ export default function App() {
                     borderRadius: 12,
                     border: `1px solid ${C.separator}`,
                   }}>
-                    <div style={{ fontSize: 11, color: C.labelSecond, marginBottom: 8, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                    <label htmlFor="input-kenpo-rate" style={{ display: "block", fontSize: 11, color: C.labelSecond, marginBottom: 8, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase" }}>
                       被保険者折半率を直接入力
-                    </div>
+                    </label>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <div style={{
                         flex: 1,
@@ -1145,6 +1236,8 @@ export default function App() {
                         background: C.surface3,
                       }}>
                         <button
+                          type="button"
+                          aria-label="折半率を減らす"
                           onClick={() => { setCustomKenpoRate(v => +(Math.max(1, v - 0.1).toFixed(2))); resetRan(); }}
                           style={{
                             padding: "10px 16px", background: "none", border: "none",
@@ -1153,9 +1246,18 @@ export default function App() {
                             lineHeight: 1, fontFamily: "inherit", fontWeight: 300,
                           }}>−</button>
                         <input
+                          id="input-kenpo-rate"
                           type="number"
                           value={customKenpoRate}
-                          onChange={e => { setCustomKenpoRate(+e.target.value); resetRan(); }}
+                          onChange={e => {
+                            const n = +e.target.value;
+                            if (Number.isFinite(n)) { setCustomKenpoRate(n); resetRan(); }
+                          }}
+                          onBlur={e => {
+                            const n = +e.target.value;
+                            setCustomKenpoRate(Number.isFinite(n) ? Math.min(15, Math.max(1, n)) : 1);
+                            resetRan();
+                          }}
                           min={1} max={15} step={0.1}
                           style={{
                             flex: 1, padding: "10px 4px",
@@ -1166,6 +1268,8 @@ export default function App() {
                           }}
                         />
                         <button
+                          type="button"
+                          aria-label="折半率を増やす"
                           onClick={() => { setCustomKenpoRate(v => +(Math.min(15, v + 0.1).toFixed(2))); resetRan(); }}
                           style={{
                             padding: "10px 16px", background: "none", border: "none",
@@ -1200,9 +1304,9 @@ export default function App() {
               <div style={{ fontSize: 11, fontWeight: 600, color: C.labelSecond, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 10 }}>
                 社宅会社負担割合
               </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <div role="group" aria-label="社宅会社負担割合" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {[50, 60, 70, 75, 80, 85, 90, 100].map(r => (
-                  <button key={r} onClick={() => { setCoRatio(r); resetRan(); }} style={{
+                  <button key={r} type="button" aria-pressed={coRatio === r} onClick={() => { setCoRatio(r); resetRan(); }} style={{
                     padding: "8px 14px", borderRadius: 8,
                     border: `1px solid ${coRatio === r ? C.blue : C.separator}`,
                     background: coRatio === r ? C.blue : "transparent",
@@ -1245,6 +1349,8 @@ export default function App() {
                 />
                 {joinYM && (
                   <button
+                    type="button"
+                    aria-label="入社想定日をクリア"
                     onClick={() => setJoinYM("")}
                     style={{ background: "none", border: "none", color: C.gray, cursor: "pointer", fontSize: 16, padding: "4px 8px", fontFamily: "inherit" }}
                   >×</button>
@@ -1340,8 +1446,8 @@ export default function App() {
         }}>
           {/* 都道府県 */}
           <div>
-            <label style={lbl}>居住都道府県</label>
-            <select value={pref} onChange={e => { setPref(e.target.value); resetRan(); }} style={selectStyle}>
+            <label style={lbl} htmlFor="input-pref">居住都道府県</label>
+            <select id="input-pref" value={pref} onChange={e => { setPref(e.target.value); resetRan(); }} style={selectStyle}>
               {PREFS.map(p => (
                 <option key={p} value={p}>{p}　（{KENPO_RATES[p]}%）</option>
               ))}
@@ -1353,8 +1459,8 @@ export default function App() {
 
           {/* 賞与月数 */}
           <div>
-            <label style={lbl}>賞与月数</label>
-            <div style={{
+            <label style={lbl} id="label-bonus">賞与月数</label>
+            <div role="group" aria-labelledby="label-bonus" style={{
               display: "flex", gap: 4,
               background: "rgba(118,118,128,0.18)",
               borderRadius: 10, padding: 3,
@@ -1374,8 +1480,8 @@ export default function App() {
 
           {/* 提示年収 */}
           <div>
-            <label style={lbl}>提示年収（万円）</label>
-            <NumInput val={nenshu} setter={setNenshu} min={100} max={3000} step={10} onDone={resetRan} isMobile={isMobile} />
+            <label style={lbl} htmlFor="input-nenshu">提示年収（万円）</label>
+            <NumInput id="input-nenshu" label="提示年収" val={nenshu} setter={setNenshu} min={100} max={3000} step={10} onDone={resetRan} isMobile={isMobile} />
             {bonus > 0 && (
               <div style={{ marginTop: 6, fontSize: 11, color: C.gray }}>
                 月給 約{Math.round(nenshu / (12 + bonus))}万　+　賞与 約{Math.round(nenshu * bonus / (12 + bonus))}万/年
@@ -1385,14 +1491,14 @@ export default function App() {
 
           {/* 家賃 */}
           <div>
-            <label style={lbl}>想定家賃・月額（万円）</label>
-            <NumInput val={yachin} setter={setYachin} min={1} max={100} step={0.5} onDone={resetRan} isMobile={isMobile} />
+            <label style={lbl} htmlFor="input-yachin">想定家賃・月額（万円）</label>
+            <NumInput id="input-yachin" label="想定家賃" val={yachin} setter={setYachin} min={1} max={100} step={0.5} onDone={resetRan} isMobile={isMobile} />
           </div>
 
           {/* 年齢 */}
           <div>
-            <label style={lbl}>年齢</label>
-            <NumInput val={age} setter={setAge} min={18} max={70} step={1} onDone={resetRan} isMobile={isMobile} />
+            <label style={lbl} htmlFor="input-age">年齢</label>
+            <NumInput id="input-age" label="年齢" val={age} setter={setAge} min={18} max={70} step={1} onDone={resetRan} isMobile={isMobile} />
             {age >= 40 && (
               <div style={{ marginTop: 6, fontSize: 11, color: C.orange, fontWeight: 500 }}>
                 40歳以上：介護保険料が加算されます
@@ -1402,8 +1508,8 @@ export default function App() {
 
           {/* 扶養 */}
           <div>
-            <label style={lbl}>扶養家族の人数</label>
-            <div style={{
+            <label style={lbl} id="label-dep">扶養家族の人数</label>
+            <div role="group" aria-labelledby="label-dep" style={{
               display: "flex", gap: 4,
               background: "rgba(118,118,128,0.18)",
               borderRadius: 10, padding: 3,
@@ -1613,12 +1719,12 @@ export default function App() {
             }}>
               <button
                 onClick={() => {
+                  // 個人の年収・家賃等を含むbuildShareURL()はシェア投稿には使わない（第三者に公開されるため）
                   const sign = diff >= 0 ? "+" : "";
                   const text = encodeURIComponent(
                     `社宅条件をシミュレーションしました。社宅あり/なしの手取り差額は年間${sign}${yen2(diff)}。\n#転職 #社宅シミュレーター`
                   );
-                  const url = encodeURIComponent(buildShareURL());
-                  window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, "_blank", "noopener,noreferrer");
+                  window.open(`https://twitter.com/intent/tweet?text=${text}`, "_blank", "noopener,noreferrer");
                 }}
                 style={{
                   flex: 1, padding: isMobile ? "14px" : "12px",
@@ -1632,8 +1738,10 @@ export default function App() {
               </button>
               <button
                 onClick={() => {
-                  const url = encodeURIComponent(buildShareURL());
-                  window.open(`https://social-plugins.line.me/lineit/share?url=${url}`, "_blank", "noopener,noreferrer");
+                  // 個人の年収・家賃等を含むbuildShareURL()はシェア投稿には使わない（第三者に公開されるため）
+                  // パラメータを含まないツールの入口URLのみを共有する
+                  const baseUrl = encodeURIComponent(window.location.href.split("#")[0]);
+                  window.open(`https://social-plugins.line.me/lineit/share?url=${baseUrl}`, "_blank", "noopener,noreferrer");
                 }}
                 style={{
                   flex: 1, padding: isMobile ? "14px" : "12px",
@@ -1752,6 +1860,7 @@ export default function App() {
                               background: C.orange + "22", color: C.orange, letterSpacing: "0.04em",
                             }}>シナリオ {idx + 2}</span>
                             <input
+                              aria-label="シナリオ名"
                               value={sc.label}
                               onChange={e => setExtraScenarios(prev =>
                                 prev.map(s => s.id === sc.id ? { ...s, label: e.target.value } : s)
@@ -1765,6 +1874,8 @@ export default function App() {
                             />
                           </div>
                           <button
+                            type="button"
+                            aria-label="シナリオを削除"
                             onClick={() => setExtraScenarios(prev => prev.filter(s => s.id !== sc.id))}
                             style={{
                               background: "none", border: "none", color: C.gray,
@@ -1783,14 +1894,25 @@ export default function App() {
                               border: `1px solid ${C.separator}`, borderRadius: 8, overflow: "hidden",
                               background: C.surface3,
                             }}>
-                              <button onClick={() => setExtraScenarios(prev => prev.map(s => s.id === sc.id ? { ...s, yachin: Math.max(1, +(s.yachin - 0.5).toFixed(1)) } : s))}
+                              <button type="button" aria-label="家賃を減らす" onClick={() => setExtraScenarios(prev => prev.map(s => s.id === sc.id ? { ...s, yachin: Math.max(1, +(s.yachin - 0.5).toFixed(1)) } : s))}
                                 style={{ padding: "8px 12px", background: "none", border: "none", color: C.blue, fontSize: 16, cursor: "pointer", borderRight: `1px solid ${C.separator}`, fontFamily: "inherit" }}>−</button>
                               <input
+                                aria-label="家賃・月額（万円）"
                                 type="number" value={sc.yachin} min={1} max={100} step={0.5}
-                                onChange={e => setExtraScenarios(prev => prev.map(s => s.id === sc.id ? { ...s, yachin: +e.target.value } : s))}
+                                onChange={e => {
+                                  const n = +e.target.value;
+                                  if (Number.isFinite(n)) {
+                                    setExtraScenarios(prev => prev.map(s => s.id === sc.id ? { ...s, yachin: n } : s));
+                                  }
+                                }}
+                                onBlur={e => {
+                                  const n = +e.target.value;
+                                  const clamped = Number.isFinite(n) ? Math.min(100, Math.max(1, n)) : 1;
+                                  setExtraScenarios(prev => prev.map(s => s.id === sc.id ? { ...s, yachin: clamped } : s));
+                                }}
                                 style={{ flex: 1, padding: "8px 4px", border: "none", background: "transparent", textAlign: "center", fontSize: 13, color: C.labelPrimary, outline: "none", fontFamily: "inherit" }}
                               />
-                              <button onClick={() => setExtraScenarios(prev => prev.map(s => s.id === sc.id ? { ...s, yachin: Math.min(100, +(s.yachin + 0.5).toFixed(1)) } : s))}
+                              <button type="button" aria-label="家賃を増やす" onClick={() => setExtraScenarios(prev => prev.map(s => s.id === sc.id ? { ...s, yachin: Math.min(100, +(s.yachin + 0.5).toFixed(1)) } : s))}
                                 style={{ padding: "8px 12px", background: "none", border: "none", color: C.blue, fontSize: 16, cursor: "pointer", borderLeft: `1px solid ${C.separator}`, fontFamily: "inherit" }}>＋</button>
                             </div>
                           </div>
@@ -1798,9 +1920,11 @@ export default function App() {
                             <div style={{ fontSize: 10, color: C.gray, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 6 }}>
                               会社負担割合
                             </div>
-                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                            <div role="group" aria-label="会社負担割合" style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                               {[50, 60, 70, 75, 80, 85, 90, 100].map(r => (
                                 <button key={r}
+                                  type="button"
+                                  aria-pressed={sc.coRatio === r}
                                   onClick={() => setExtraScenarios(prev => prev.map(s => s.id === sc.id ? { ...s, coRatio: r } : s))}
                                   style={{
                                     padding: "5px 10px", borderRadius: 6,
@@ -2060,7 +2184,8 @@ export default function App() {
         color: C.gray, fontSize: 11, lineHeight: 1.8,
       }}>
         <div>本ツールは概算シミュレーション用です。実際の金額は状況により異なります。</div>
-        <div>協会けんぽ {RATE_YEAR} 年度料率を使用。厚生年金 18.30% · 雇用保険 0.50%（被保険者）· 介護保険 1.62%（折半）。</div>
+        <div>協会けんぽ {RATE_YEAR} 年度料率を使用。厚生年金 18.30% · 雇用保険 0.50%（被保険者・一般事業）· 介護保険 1.62%（折半）。</div>
+        <div>所得税の基礎控除は令和7・8年度税制改正に対応（基礎控除58万円＋給与所得に応じた時限上乗せ措置、給与所得控除最低65万円）。令和9年分以降は時限措置が終了するため再計算ロジックの見直しが必要です。</div>
       </div>
 
       <style>{`
