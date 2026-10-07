@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { C, SectionLabel, Row, NumInput, SegBtn } from "./App.jsx";
+import { C } from "./theme.js";
+import { SectionLabel, Row, NumInput, SegBtn } from "./components/primitives.jsx";
 
 // ─────────────────────────────────────────────────────────────
 // 借上社宅管理規程 第9条・第11条 準拠の計算ロジック
@@ -42,6 +43,9 @@ const calcKitei = (kihonkyu, taido, chinryo) => {
 };
 
 const yen = (v) => `${Math.round(v).toLocaleString()}円`;
+
+// 計算ロジックをユニットテストから利用するための再エクスポート（UIからは未使用）
+export { TAIDO_RATIO, KITEI_COMPANY_RATIO, calcLimits, calcKitei };
 
 // ─────────────────────────────────────────────────────────────
 // ページ
