@@ -138,7 +138,11 @@ const calcJumin = (nenshu, shakai, dep) => {
 // ・雇用保険料率 0.50%（被保険者負担・一般事業）: 令和8年度（令和8年4月〜令和9年3月）。
 //   農林水産・清酒製造業・建設業は被保険者負担0.60%と異なるため、本ツールは一般事業を前提とする。
 //   出典: https://jsite.mhlw.go.jp/yamanashi-roudoukyoku/koyouhoken_R8.html
+// ・健康保険・介護保険の標準賞与額上限は「年度（4月〜翌3月）累計573万円」。
+//   厚生年金の上限（1回の賞与ごとに150万円）とは算定単位が異なるため区別すること。
+//   出典: 全国健康保険協会（協会けんぽ） https://www.kyoukaikenpo.or.jp/
 // ─────────────────────────────────────────────────────────────
+const KENPO_BONUS_ANNUAL_CAP = 5730000;
 const calcPattern = (nenshu, yachin, age, dep, withShatak, kenpoRate, bonusMonths, coRatio) => {
   const coR = coRatio / 100;
   const teiji = withShatak ? nenshu - yachin * coR * 12 : nenshu;
@@ -152,10 +156,11 @@ const calcPattern = (nenshu, yachin, age, dep, withShatak, kenpoRate, bonusMonth
   const koyo  = Math.round(monthly * 0.0050);                 // 雇用保険0.50%（被保険者・一般事業）
   const monthly_shakai = kenpo + kaigo + kosei + koyo;
   const bh = Math.floor(annualBonus / 1000) * 1000;
+  const bhKenpo = Math.min(bh, KENPO_BONUS_ANNUAL_CAP); // 健保・介護保険は年度累計573万円で頭打ち
   const bonus_shakai =
-    Math.round(bh * kenpoRate) +
-    (age >= 40 ? Math.round(bh * 0.0081) : 0) +
-    Math.round(Math.min(bh, 1500000) * 0.0915) +
+    Math.round(bhKenpo * kenpoRate) +
+    (age >= 40 ? Math.round(bhKenpo * 0.0081) : 0) +
+    Math.round(Math.min(bh, 1500000) * 0.0915) + // 厚生年金は1回の賞与ごと150万円で頭打ち
     Math.round(annualBonus * 0.0050);
   const annual_shakai = monthly_shakai * 12 + bonus_shakai;
   const shotokuGaku = teiji - kyuyoKojo(teiji); // 給与所得（基礎控除の判定にも使用）
@@ -182,6 +187,12 @@ const calcPattern = (nenshu, yachin, age, dep, withShatak, kenpoRate, bonusMonth
     co_shakai, co_yachin,
     companyTotal: monthly + co_shakai + co_yachin,
   };
+};
+
+// 計算ロジックをユニットテストから利用するための再エクスポート（UIからは未使用）
+export {
+  getHyojun, getKenpoHyojun, kyuyoKojo, kisoKojoTokurei, kisoKojoShotoku,
+  calcShotoku, calcJumin, calcPattern, KENPO_BONUS_ANNUAL_CAP,
 };
 
 const yen  = (v) => Math.abs(v) >= 10000 ? `${(v / 10000).toFixed(1)}万円` : `${Math.round(v).toLocaleString()}円`;

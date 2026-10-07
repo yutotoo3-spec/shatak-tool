@@ -43,6 +43,9 @@ const calcKitei = (kihonkyu, taido, chinryo) => {
 
 const yen = (v) => `${Math.round(v).toLocaleString()}円`;
 
+// 計算ロジックをユニットテストから利用するための再エクスポート（UIからは未使用）
+export { TAIDO_RATIO, KITEI_COMPANY_RATIO, calcLimits, calcKitei };
+
 // ─────────────────────────────────────────────────────────────
 // ページ
 // ─────────────────────────────────────────────────────────────
