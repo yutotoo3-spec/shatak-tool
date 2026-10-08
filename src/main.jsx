@@ -1,13 +1,16 @@
-import React from 'react'
+import React, { Suspense, lazy } from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App.jsx'
-import KiteiApp from './KiteiApp.jsx'
+
+const App = lazy(() => import('./App.jsx'))
+const KiteiApp = lazy(() => import('./KiteiApp.jsx'))
 
 const path = window.location.pathname.replace(/\/+$/, '') || '/'
 const Root = path === '/kitei' ? KiteiApp : App
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <Root />
+    <Suspense fallback={null}>
+      <Root />
+    </Suspense>
   </React.StrictMode>,
 )
