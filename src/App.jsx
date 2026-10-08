@@ -1,13 +1,17 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, Suspense, lazy } from "react";
 import { RATE_YEAR, KENPO_RATES, PREFS, KUMIAI_PRESETS } from "./rates.js";
 import { calcPattern } from "./calc.js";
 import { yen, yen2 } from "./format.js";
 import { clampOrNull } from "./utils.js";
 import { C } from "./theme.js";
 import { Badge, NumInput, SegBtn } from "./components/primitives.jsx";
-import { CompareChart } from "./components/CompareChart.jsx";
 import { CostSummaryTable } from "./components/CostSummaryTable.jsx";
 import { PatternCard } from "./components/PatternCard.jsx";
+
+// recharts（グラフ描画）はシミュレーション結果を表示するまで不要なため、初回ロードを軽くするために動的import化
+const CompareChart = lazy(() =>
+  import("./components/CompareChart.jsx").then(m => ({ default: m.CompareChart }))
+);
 
 // ─────────────────────────────────────────────────────────────
 // メインアプリ
@@ -891,7 +895,15 @@ export default function App() {
           />
 
           {/* グラフ */}
-          <CompareChart no={result.no} yes={result.yes} isMobile={isMobile} />
+          <Suspense fallback={
+            <div style={{
+              background: C.surface, borderRadius: 16,
+              marginBottom: 12, border: `1px solid ${C.separator}`,
+              height: isMobile ? 190 : 210,
+            }} />
+          }>
+            <CompareChart no={result.no} yes={result.yes} isMobile={isMobile} />
+          </Suspense>
 
           {/* 2カード */}
           <div style={{

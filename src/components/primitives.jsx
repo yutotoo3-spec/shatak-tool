@@ -24,30 +24,6 @@ export const Badge = ({ approx }) => (
   }}>{approx ? "概算" : "確定"}</span>
 );
 
-// フォーム内 Row（白カード用）
-export const FormRow = ({ label, value, approx, bold, muted }) => (
-  <div style={{
-    display: "flex", justifyContent: "space-between", alignItems: "center",
-    padding: "8px 0",
-    borderBottom: `1px solid ${C.formSep}`,
-  }}>
-    <span style={{
-      fontSize: muted ? 12 : 13,
-      color: muted ? C.gray : C.formSecond,
-      fontWeight: bold ? 600 : 400,
-    }}>
-      {label}{approx !== undefined && <Badge approx={approx} />}
-    </span>
-    <span style={{
-      fontSize: muted ? 12 : 13,
-      fontWeight: bold ? 700 : 500,
-      color: bold ? C.blue : C.formLabel,
-    }}>
-      {value}
-    </span>
-  </div>
-);
-
 // 結果カード内 Row（ダークカード用）
 export const Row = ({ label, value, approx, bold, muted, green }) => (
   <div style={{
