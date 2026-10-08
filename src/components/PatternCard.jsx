@@ -1,5 +1,5 @@
 import { C } from "../theme.js";
-import { yen, yen2 } from "../format.js";
+import { yen, yen2 } from "../format";
 import { Row } from "./primitives.jsx";
 
 // ── 詳細カード

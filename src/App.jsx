@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect, useCallback, Suspense, lazy } from "react";
-import { RATE_YEAR, KENPO_RATES, PREFS, KUMIAI_PRESETS } from "./rates.js";
-import { calcPattern } from "./calc.js";
-import { yen, yen2 } from "./format.js";
-import { clampOrNull } from "./utils.js";
+import { RATE_YEAR, KENPO_RATES, PREFS, KUMIAI_PRESETS } from "./rates";
+import { calcPattern } from "./calc";
+import { yen, yen2 } from "./format";
+import { clampOrNull } from "./utils";
 import { C } from "./theme.js";
 import { Badge, NumInput, SegBtn } from "./components/primitives.jsx";
 import { CostSummaryTable } from "./components/CostSummaryTable.jsx";

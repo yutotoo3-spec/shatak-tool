@@ -2,7 +2,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList,
 } from "recharts";
 import { C } from "../theme.js";
-import { man } from "../format.js";
+import { man } from "../format";
 import { SectionLabel } from "./primitives.jsx";
 
 // ── カスタムチャートツールチップ

@@ -4,14 +4,14 @@
 
 // 適用年度（毎年3月改定）
 // 出典: https://www.kyoukaikenpo.or.jp/g7/cat330/sb3130/
-export const RATE_YEAR = "2026（令和8）";
+export const RATE_YEAR: string = "2026（令和8）";
 
 // ─────────────────────────────────────────────────────────────
 // 協会けんぽ 都道府県別 健康保険料率（令和8年度・被保険者折半率 %）
 // ※ 令和8年3月分（4月納付分）から適用
 // 出典: https://www.kyoukaikenpo.or.jp/about/business/insurance_rate/rate_prefectures/r08/index.html
 // ─────────────────────────────────────────────────────────────
-export const KENPO_RATES = {
+export const KENPO_RATES: Record<string, number> = {
   "北海道":5.140,"青森":4.925,"岩手":4.755,"宮城":5.050,"秋田":5.005,
   "山形":4.875,"福島":4.750,"茨城":4.760,"栃木":4.910,"群馬":4.840,
   "埼玉":4.835,"千葉":4.865,"東京":4.925,"神奈川":4.960,"新潟":4.605,
@@ -28,7 +28,7 @@ export const PREFS = Object.keys(KENPO_RATES);
 // ─────────────────────────────────────────────────────────────
 // 健康保険組合・共済組合 プリセット（被保険者折半率 %）
 // ─────────────────────────────────────────────────────────────
-export const KUMIAI_PRESETS = [
+export const KUMIAI_PRESETS: { name: string; rate: number; desc: string }[] = [
   { name: "IT・通信系",     rate: 4.50, desc: "例: 情報サービス産業健保" },
   { name: "製造業系",       rate: 4.80, desc: "例: 電機・機械系健保組合" },
   { name: "金融・保険",     rate: 4.30, desc: "例: 銀行・生保系健保組合" },
@@ -42,7 +42,7 @@ export const KUMIAI_PRESETS = [
 ];
 
 // 厚生年金保険の標準報酬月額（32等級・上限65万円）
-export const HYOJUN_TABLE = [
+export const HYOJUN_TABLE: [number, number][] = [
   [88000,93000],[98000,101000],[104000,107000],[110000,114000],
   [118000,122000],[126000,130000],[134000,138000],[142000,146000],
   [150000,155000],[160000,165000],[170000,175000],[180000,185000],
@@ -52,7 +52,7 @@ export const HYOJUN_TABLE = [
   [440000,455000],[470000,485000],[500000,515000],[530000,545000],
   [560000,575000],[590000,605000],[620000,635000],[650000,Infinity],
 ];
-export const getHyojun = (m) => {
+export const getHyojun = (m: number): number => {
   for (const [h, u] of HYOJUN_TABLE) if (m < u) return h;
   return 650000;
 };
@@ -60,7 +60,7 @@ export const getHyojun = (m) => {
 // 健康保険・介護保険の標準報酬月額（50等級・上限139万円）
 // 厚生年金より等級数が多く上限も高いため、別テーブルとして保持する
 // 出典: 健康保険法（平成28年4月1日改正で48〜50等級を追加）
-export const KENPO_HYOJUN_TABLE = [
+export const KENPO_HYOJUN_TABLE: [number, number][] = [
   [58000,63000],[68000,73000],[78000,83000],
   [88000,93000],[98000,101000],[104000,107000],[110000,114000],
   [118000,122000],[126000,130000],[134000,138000],[142000,146000],
@@ -75,7 +75,7 @@ export const KENPO_HYOJUN_TABLE = [
   [1030000,1055000],[1090000,1115000],[1150000,1175000],[1210000,1235000],
   [1270000,1295000],[1330000,1355000],[1390000,Infinity],
 ];
-export const getKenpoHyojun = (m) => {
+export const getKenpoHyojun = (m: number): number => {
   for (const [h, u] of KENPO_HYOJUN_TABLE) if (m < u) return h;
   return 1390000;
 };

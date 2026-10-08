@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getHyojun, getKenpoHyojun } from "./rates.js";
+import { getHyojun, getKenpoHyojun } from "./rates";
 
 describe("getHyojun（厚生年金の標準報酬月額・32等級・上限65万円）", () => {
   it("等級テーブルの境界値で正しい等級に丸める", () => {
