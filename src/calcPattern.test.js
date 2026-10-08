@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcPattern } from "./calc.js";
+import { calcPattern } from "./calc";
 
 describe("calcPattern: 社宅なしの基本ケース", () => {
   it("理論年収600万円・賞与なし・45歳（介護保険対象）の月次社保内訳", () => {

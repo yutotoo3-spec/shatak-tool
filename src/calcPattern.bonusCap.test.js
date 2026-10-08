@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcPattern, KENPO_BONUS_ANNUAL_CAP } from "./calc.js";
+import { calcPattern, KENPO_BONUS_ANNUAL_CAP } from "./calc";
 
 // issue #39: 健康保険・介護保険の標準賞与額は年度累計573万円で頭打ちになるが、
 // 以前の実装では上限が適用されず、高年収・賞与多めのケースで保険料を過大に計算していた。

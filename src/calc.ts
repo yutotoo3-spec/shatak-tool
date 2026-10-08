@@ -1,4 +1,4 @@
-import { getHyojun, getKenpoHyojun } from "./rates.js";
+import { getHyojun, getKenpoHyojun } from "./rates";
 
 // ─────────────────────────────────────────────────────────────
 // 所得税・住民税の計算ロジック
@@ -6,7 +6,7 @@ import { getHyojun, getKenpoHyojun } from "./rates.js";
 
 // 給与所得控除（令和7年度税制改正で最低保証額55万円→65万円・適用上限1,625,000円→1,900,000円に変更。
 // 国税庁「令和7年分の年末調整のしかた」速算表に準拠。所得税・住民税の両方で共通して使う給与所得の算出に使用）
-export const kyuyoKojo = (y) => {
+export const kyuyoKojo = (y: number): number => {
   if (y <= 1900000) return 650000;
   if (y <= 3600000) return y * 0.3 + 80000;
   if (y <= 6600000) return y * 0.2 + 440000;
@@ -19,22 +19,22 @@ export const kyuyoKojo = (y) => {
 // 令和9年分以降は上乗せ特例が終了するため、その時点で baseKisoKojo の分岐は見直しが必要。
 // 合計所得2,400万円超の段階的減少・消失ルールは本措置以前から存在する恒久ルール。
 // 出典: 国税庁「令和7年度税制改正による所得税の基礎控除の見直し」
-export const kisoKojoTokurei = (shotokuGaku) => {
+export const kisoKojoTokurei = (shotokuGaku: number): number => {
   if (shotokuGaku <= 1320000) return 370000;
   if (shotokuGaku <= 3360000) return 300000;
   if (shotokuGaku <= 4890000) return 100000;
   if (shotokuGaku <= 6550000) return 50000;
   return 0;
 };
-export const kisoKojoShotoku = (shotokuGaku) => {
+export const kisoKojoShotoku = (shotokuGaku: number): number => {
   if (shotokuGaku > 25000000) return 0;
   if (shotokuGaku > 24500000) return 160000;
   if (shotokuGaku > 24000000) return 320000;
   return 580000 + kisoKojoTokurei(shotokuGaku);
 };
-export const calcShotoku = (k) => {
+export const calcShotoku = (k: number): number => {
   if (k <= 0) return 0;
-  let t;
+  let t: number;
   if (k <= 1950000) t = k * 0.05;
   else if (k <= 3300000) t = k * 0.1 - 97500;
   else if (k <= 6950000) t = k * 0.2 - 427500;
@@ -45,7 +45,7 @@ export const calcShotoku = (k) => {
 };
 // 住民税の基礎控除（43万円）は所得税と異なり令和7年度税制改正の対象外で変更なし。
 // ただし給与所得控除（kyuyoKojo）の見直しは住民税にも共通して適用される。
-export const calcJumin = (nenshu, shakai, dep) => {
+export const calcJumin = (nenshu: number, shakai: number, dep: number): number => {
   const s = nenshu - kyuyoKojo(nenshu);
   return Math.floor(Math.max(0, s - shakai - 430000 - 330000 * dep) * 0.1 + 5000);
 };
@@ -63,9 +63,44 @@ export const calcJumin = (nenshu, shakai, dep) => {
 //   厚生年金の上限（1回の賞与ごとに150万円）とは算定単位が異なるため区別すること。
 //   出典: 全国健康保険協会（協会けんぽ） https://www.kyoukaikenpo.or.jp/
 // ─────────────────────────────────────────────────────────────
-export const KENPO_BONUS_ANNUAL_CAP = 5730000;
+export const KENPO_BONUS_ANNUAL_CAP: number = 5730000;
 
-export const calcPattern = (nenshu, yachin, age, dep, withShatak, kenpoRate, bonusMonths, coRatio) => {
+export interface CalcPatternResult {
+  teiji: number;
+  monthly: number;
+  annualBonus: number;
+  h: number;
+  kenpo: number;
+  kaigo: number;
+  kosei: number;
+  koyo: number;
+  monthly_shakai: number;
+  bonus_shakai: number;
+  annual_shakai: number;
+  m_shakai: number;
+  m_shotoku: number;
+  m_jumin: number;
+  m_tedori: number;
+  annual_tedori: number;
+  annual_shotoku: number;
+  annual_jumin: number;
+  selfYachin: number;
+  annual_yachin: number;
+  co_shakai: number;
+  co_yachin: number;
+  companyTotal: number;
+}
+
+export const calcPattern = (
+  nenshu: number,
+  yachin: number,
+  age: number,
+  dep: number,
+  withShatak: boolean,
+  kenpoRate: number,
+  bonusMonths: number,
+  coRatio: number,
+): CalcPatternResult => {
   const coR = coRatio / 100;
   const teiji = withShatak ? nenshu - yachin * coR * 12 : nenshu;
   const monthly = teiji / (12 + bonusMonths);

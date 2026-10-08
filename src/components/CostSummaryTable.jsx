@@ -1,5 +1,5 @@
 import { C } from "../theme.js";
-import { yen2 } from "../format.js";
+import { yen2 } from "../format";
 import { SectionLabel } from "./primitives.jsx";
 
 export const CostSummaryTable = ({ no, yes, nenshu, isMobile }) => {
