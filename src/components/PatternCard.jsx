@@ -44,8 +44,8 @@ export const PatternCard = ({ title, isRecommended, data, coRatio, isMobile }) =
     <div style={{ padding: "16px 18px" }}>
       {/* 手取りハイライト */}
       <div style={{
-        background: isRecommended ? "rgba(48,209,88,0.1)" : C.surface2,
-        border: `1px solid ${isRecommended ? "rgba(48,209,88,0.3)" : C.separator}`,
+        background: isRecommended ? "rgba(52,199,89,0.1)" : C.surface2,
+        border: `1px solid ${isRecommended ? "rgba(52,199,89,0.3)" : C.separator}`,
         borderRadius: 12, padding: "14px 16px",
         marginBottom: 16, textAlign: "center",
       }}>

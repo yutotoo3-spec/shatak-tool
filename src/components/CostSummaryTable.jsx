@@ -33,7 +33,7 @@ export const CostSummaryTable = ({ no, yes, nenshu, isMobile }) => {
       color: green ? C.green : blue ? C.blue : muted ? C.gray : C.labelPrimary,
       textAlign: right ? "right" : "left",
       borderBottom: `1px solid ${C.separator}`,
-      background: bold && (green || blue) ? (green ? "rgba(48,209,88,0.08)" : "rgba(10,132,255,0.08)") : "transparent",
+      background: bold && (green || blue) ? (green ? "rgba(52,199,89,0.08)" : "rgba(0,122,255,0.08)") : "transparent",
       whiteSpace: "nowrap",
     }}>{children}</td>
   );
