@@ -1,20 +1,14 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { C } from "./theme.js";
 import { SectionLabel, Row, NumInput, SegBtn } from "./components/primitives.jsx";
+import { TAIDO_RATIO, calcLimits } from "./calc";
 
 // ─────────────────────────────────────────────────────────────
 // 借上社宅管理規程 第9条・第11条 準拠の計算ロジック
 // 端数処理: 円未満切り捨て（暫定ルール。社内ルール確定後に見直し）
+// TAIDO_RATIO・calcLimits（基本給から家賃の目安を算出する部分）は
+// 概算ツール（App.jsx）とも共有するため calc.ts に定義している
 // ─────────────────────────────────────────────────────────────
-const TAIDO_RATIO = { tanshin: 1 / 5, kazoku: 1 / 4 };
-
-// 基本給から補助対象限度額・提供上限（要相談ライン）を算出
-// 実賃料が未確定の段階（物件探しの前）でも使える、家賃の目安算出
-const calcLimits = (kihonkyu, taido) => {
-  const genzai = Math.floor(kihonkyu * TAIDO_RATIO[taido]); // 補助対象限度額
-  const warnThreshold = Math.floor(genzai * 1.5);           // 提供可否の目安ライン
-  return { genzai, warnThreshold };
-};
 
 // 実賃料が決まった段階での会社負担・本人負担の算出
 // 会社負担70%／本人負担30%は借上社宅管理規程 第9条に定める確定値であり、設定変更はできない。
