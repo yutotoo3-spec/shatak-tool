@@ -145,3 +145,25 @@ export const calcPattern = (
     companyTotal: monthly + co_shakai + co_yachin,
   };
 };
+
+// ─────────────────────────────────────────────────────────────
+// 借上社宅管理規程 第9条: 基本給に対する補助対象限度額の比率
+// 単身: 基本給×1/5 ／ 配偶者・扶養家族と同居（家族帯同）: 基本給×1/4
+// 規定通りツール（KiteiApp）・概算ツール（App）の両方から参照する共通ロジック
+// ─────────────────────────────────────────────────────────────
+export type Taido = "tanshin" | "kazoku";
+
+export const TAIDO_RATIO: Record<Taido, number> = { tanshin: 1 / 5, kazoku: 1 / 4 };
+
+export interface KiteiLimits {
+  genzai: number;
+  warnThreshold: number;
+}
+
+// 基本給から補助対象限度額・提供上限（要相談ライン）を算出
+// 実賃料が未確定の段階（物件探しの前）でも使える、家賃の目安算出
+export const calcLimits = (kihonkyu: number, taido: Taido): KiteiLimits => {
+  const genzai = Math.floor(kihonkyu * TAIDO_RATIO[taido]); // 補助対象限度額
+  const warnThreshold = Math.floor(genzai * 1.5);           // 提供可否の目安ライン
+  return { genzai, warnThreshold };
+};

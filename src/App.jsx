@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, Suspense, lazy } from "react";
 import { RATE_YEAR, KENPO_RATES, PREFS, KUMIAI_PRESETS } from "./rates";
-import { calcPattern } from "./calc";
+import { calcPattern, calcLimits } from "./calc";
 import { yen, yen2 } from "./format";
 import { clampOrNull } from "./utils";
 import { C } from "./theme.js";
@@ -88,6 +88,16 @@ export default function App() {
   }, [ran, nenshu, yachin, age, dep, kenpoRate, bonus, coRatio]);
 
   const diff = result ? result.yes.annual_tedori - result.no.annual_tedori : 0;
+
+  // 借上社宅管理規程ベースの家賃目安（物件が未確定の段階でも提示年収だけで概算できる）。
+  // 扶養家族の人数から帯同区分を簡易判定（0人なら単身、1人以上なら家族帯同とみなす）。
+  // 正式な判定・金額は物件確定後に規定通りツール（/kitei）で確認する。
+  const taido = dep > 0 ? "kazoku" : "tanshin";
+  const kihonkyuNoShatak = Math.floor((nenshu * 10000) / (12 + bonus));
+  const rentLimit = useMemo(
+    () => calcLimits(kihonkyuNoShatak, taido),
+    [kihonkyuNoShatak, taido],
+  );
 
   const buildShareURL = useCallback(() => {
     const base = { n: nenshu, y: yachin, a: age, d: dep, p: pref, b: bonus, r: coRatio };
@@ -761,6 +771,21 @@ export default function App() {
                 月給 約{Math.round(nenshu / (12 + bonus))}万　+　賞与 約{Math.round(nenshu * bonus / (12 + bonus))}万/年
               </div>
             )}
+            <div style={{
+              marginTop: 8, padding: "9px 11px",
+              background: "rgba(10,132,255,0.08)",
+              borderRadius: 8,
+            }}>
+              <div style={{ fontSize: 10, color: C.blue, fontWeight: 600, marginBottom: 3 }}>
+                会社制度で支払える家賃の目安（規程基準・{taido === "kazoku" ? "家族帯同" : "単身"}）
+              </div>
+              <div style={{ fontSize: 12, color: C.formSecond }}>
+                上限　<strong style={{ color: C.formLabel }}>{yen(rentLimit.genzai)}</strong>　／　要相談ライン　<strong style={{ color: C.formLabel }}>{yen(rentLimit.warnThreshold)}</strong>
+              </div>
+              <div style={{ fontSize: 10, color: C.gray, marginTop: 3 }}>
+                扶養家族の人数から簡易判定した概算です。正式な金額は物件確定後に規定通りツールで確認してください。
+              </div>
+            </div>
           </div>
 
           {/* 家賃 */}
