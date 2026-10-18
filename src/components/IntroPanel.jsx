@@ -76,7 +76,7 @@ export const IntroPanel = ({ setMode, isMobile }) => (
                 display: "block", textAlign: "left", textDecoration: "none",
                 border: `1px solid ${C.separator}`, borderRadius: 12,
                 padding: "16px 18px",
-                background: C.surface2,
+                background: C.surface,
                 cursor: "pointer", fontFamily: "inherit",
                 width: "100%",
               }}
