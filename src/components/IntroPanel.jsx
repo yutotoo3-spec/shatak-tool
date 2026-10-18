@@ -45,8 +45,14 @@ const TOOLS = [
   },
 ];
 
-export const IntroPanel = ({ setMode }) => (
-  <div style={{ maxWidth: 680, margin: "0 auto 20px" }}>
+export const IntroPanel = ({ setMode, isMobile }) => (
+  <div style={{
+    maxWidth: 680, margin: "0 auto 20px",
+    background: C.formBg,
+    borderRadius: 16,
+    padding: isMobile ? "20px 16px" : "28px 32px",
+    boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+  }}>
     <SectionLabel>はじめに</SectionLabel>
     <div style={{ color: C.labelPrimary, fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
       このツールには3つの使い方があります

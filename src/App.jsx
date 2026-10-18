@@ -310,7 +310,7 @@ export default function App() {
       </div>
 
       {/* はじめに */}
-      {mode === "intro" && <IntroPanel setMode={setMode} />}
+      {mode === "intro" && <IntroPanel setMode={setMode} isMobile={isMobile} />}
 
       {/* HR 設定パネル */}
       {mode === "hr" && (
