@@ -1,21 +1,22 @@
 // ─────────────────────────────────────────────────────────────
-// Apple Design System カラー定数
+// Apple Design System カラー定数（ライトモード）
+// Apple Human Interface Guidelines のシステムカラー・ラベルカラーに準拠
 // ─────────────────────────────────────────────────────────────
 export const C = {
-  bg:           "#000000",
-  surface:      "#1C1C1E",
-  surface2:     "#2C2C2E",
-  surface3:     "#3A3A3C",
-  labelPrimary: "#FFFFFF",
-  labelSecond:  "rgba(235,235,245,0.6)",
-  labelThird:   "rgba(235,235,245,0.3)",
-  separator:    "rgba(84,84,88,0.65)",
-  blue:         "#0A84FF",
-  green:        "#30D158",
-  orange:       "#FF9F0A",
-  red:          "#FF453A",
+  bg:           "#FFFFFF",
+  surface:      "#FFFFFF",
+  surface2:     "#F2F2F7",
+  surface3:     "#E5E5EA",
+  labelPrimary: "#1C1C1E",
+  labelSecond:  "rgba(60,60,67,0.6)",
+  labelThird:   "rgba(60,60,67,0.3)",
+  separator:    "rgba(60,60,67,0.29)",
+  blue:         "#007AFF",
+  green:        "#34C759",
+  orange:       "#FF9500",
+  red:          "#FF3B30",
   gray:         "#8E8E93",
-  gray2:        "#636366",
+  gray2:        "#AEAEB2",
   formBg:       "#FFFFFF",
   formSurface:  "#F2F2F7",
   formLabel:    "#1C1C1E",

@@ -48,23 +48,22 @@ const TOOLS = [
 export const IntroPanel = ({ setMode, isMobile }) => (
   <div style={{
     maxWidth: 680, margin: "0 auto 20px",
+    background: C.formBg,
     borderRadius: 16,
-    background: C.surface,
-    border: `1px solid ${C.separator}`,
-    overflow: "hidden",
+    padding: isMobile ? "20px 16px" : "28px 32px",
+    boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
   }}>
-    <div style={{ padding: isMobile ? "18px 16px" : "22px 24px" }}>
-      <SectionLabel>はじめに</SectionLabel>
-      <div style={{ color: C.labelPrimary, fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
-        このツールには3つの使い方があります
-      </div>
-      <div style={{ color: C.labelSecond, fontSize: 12, lineHeight: 1.7, marginBottom: 20 }}>
-        内定条件を検討している段階（家賃は仮の金額でよい）では「候補者モード」「HR設定モード」の<strong style={{ color: C.labelPrimary }}>概算ツール</strong>を、
-        入社が確定し入居物件の家賃が決まった段階では「規定通り」の<strong style={{ color: C.labelPrimary }}>社内規程準拠ツール</strong>を使ってください。
-      </div>
+    <SectionLabel>はじめに</SectionLabel>
+    <div style={{ color: C.labelPrimary, fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
+      このツールには3つの使い方があります
+    </div>
+    <div style={{ color: C.labelSecond, fontSize: 12, lineHeight: 1.7, marginBottom: 20 }}>
+      内定条件を検討している段階（家賃は仮の金額でよい）では「候補者モード」「HR設定モード」の<strong style={{ color: C.labelPrimary }}>概算ツール</strong>を、
+      入社が確定し入居物件の家賃が決まった段階では「規定通り」の<strong style={{ color: C.labelPrimary }}>社内規程準拠ツール</strong>を使ってください。
+    </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {TOOLS.map(tool => {
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {TOOLS.map(tool => {
           const Card = tool.href ? "a" : "button";
           return (
             <Card
@@ -76,7 +75,7 @@ export const IntroPanel = ({ setMode, isMobile }) => (
                 display: "block", textAlign: "left", textDecoration: "none",
                 border: `1px solid ${C.separator}`, borderRadius: 12,
                 padding: "16px 18px",
-                background: C.surface2,
+                background: C.surface,
                 cursor: "pointer", fontFamily: "inherit",
                 width: "100%",
               }}
@@ -103,7 +102,6 @@ export const IntroPanel = ({ setMode, isMobile }) => (
             </Card>
           );
         })}
-      </div>
     </div>
   </div>
 );

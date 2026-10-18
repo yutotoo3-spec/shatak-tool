@@ -15,7 +15,7 @@ const ChartTooltip = ({ active, payload, label }) => {
       border: `1px solid ${C.separator}`,
       borderRadius: 12,
       padding: "10px 14px",
-      boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+      boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
       minWidth: 160,
     }}>
       <div style={{ color: C.labelSecond, fontSize: 11, fontWeight: 600, marginBottom: 8 }}>{label}</div>

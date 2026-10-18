@@ -247,7 +247,7 @@ export default function KiteiApp() {
 
         {baseError && (
           <div style={{
-            fontSize: 12, color: C.red, background: "rgba(255,69,58,0.1)",
+            fontSize: 12, color: C.red, background: "rgba(255,59,48,0.1)",
             borderRadius: 8, padding: "8px 12px",
           }}>
             {baseError}
@@ -311,7 +311,7 @@ export default function KiteiApp() {
         <div style={{ maxWidth: 480, margin: "0 auto" }}>
           {result.needsConsultation && (
             <div style={{
-              background: "rgba(255,159,10,0.15)", border: `1px solid ${C.orange}`,
+              background: "rgba(255,149,0,0.15)", border: `1px solid ${C.orange}`,
               borderRadius: 12, padding: "12px 16px", marginBottom: 12,
               color: C.orange, fontSize: 13, fontWeight: 600,
             }}>
@@ -333,7 +333,7 @@ export default function KiteiApp() {
               <SectionLabel>結果サマリー</SectionLabel>
               <span style={{
                 fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6,
-                background: result.isOver ? "rgba(255,159,10,0.15)" : "rgba(48,209,88,0.15)",
+                background: result.isOver ? "rgba(255,149,0,0.15)" : "rgba(52,199,89,0.15)",
                 color: result.isOver ? C.orange : C.green,
               }}>
                 {result.isOver ? "超過ケース" : "通常ケース"}

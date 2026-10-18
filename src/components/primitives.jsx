@@ -18,7 +18,7 @@ export const SectionLabel = ({ children, light }) => (
 export const Badge = ({ approx }) => (
   <span style={{
     fontSize: 9, padding: "2px 6px", borderRadius: 4, marginLeft: 5,
-    background: approx ? "rgba(255,159,10,0.15)" : "rgba(10,132,255,0.15)",
+    background: approx ? "rgba(255,149,0,0.15)" : "rgba(0,122,255,0.15)",
     color: approx ? C.orange : C.blue,
     fontWeight: 600, letterSpacing: "0.03em", verticalAlign: "middle",
   }}>{approx ? "概算" : "確定"}</span>
@@ -30,7 +30,7 @@ export const Row = ({ label, value, approx, bold, muted, green }) => (
     display: "flex", justifyContent: "space-between", alignItems: "center",
     padding: bold ? "10px 12px" : "7px 0",
     borderBottom: `1px solid ${C.separator}`,
-    background: bold ? (green ? "rgba(48,209,88,0.1)" : "rgba(10,132,255,0.1)") : "transparent",
+    background: bold ? (green ? "rgba(52,199,89,0.1)" : "rgba(0,122,255,0.1)") : "transparent",
     borderRadius: bold ? 8 : 0,
     marginBottom: bold ? 2 : 0,
   }}>

@@ -301,7 +301,7 @@ export default function App() {
               fontSize: 13, fontWeight: mode === m ? 600 : 400,
               background: mode === m ? C.surface : "transparent",
               color: mode === m ? C.labelPrimary : C.labelSecond,
-              boxShadow: mode === m ? "0 1px 4px rgba(0,0,0,0.3)" : "none",
+              boxShadow: mode === m ? "0 1px 4px rgba(0,0,0,0.12)" : "none",
               transition: "all 0.15s",
               letterSpacing: "-0.01em",
             }}>{label}</button>
@@ -349,13 +349,13 @@ export default function App() {
               <div style={{
                 flex: 1, minWidth: isMobile ? "100%" : 0,
                 border: `1px solid ${C.blue}`, borderRadius: 12, padding: "14px 16px",
-                background: "rgba(10,132,255,0.1)",
+                background: "rgba(0,122,255,0.1)",
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: C.labelPrimary }}>概算</span>
                   <span style={{
                     fontSize: 10, fontWeight: 600, color: C.blue,
-                    background: "rgba(10,132,255,0.15)", padding: "2px 6px", borderRadius: 4,
+                    background: "rgba(0,122,255,0.15)", padding: "2px 6px", borderRadius: 4,
                   }}>このページ</span>
                 </div>
                 <div style={{ fontSize: 11, color: C.labelSecond, lineHeight: 1.5 }}>
@@ -399,7 +399,7 @@ export default function App() {
                     fontWeight: insuranceType === t ? 600 : 400,
                     background: insuranceType === t ? C.surface : "transparent",
                     color: insuranceType === t ? C.labelPrimary : C.labelSecond,
-                    boxShadow: insuranceType === t ? "0 1px 4px rgba(0,0,0,0.3)" : "none",
+                    boxShadow: insuranceType === t ? "0 1px 4px rgba(0,0,0,0.12)" : "none",
                     transition: "all 0.15s",
                     whiteSpace: "nowrap",
                   }}>{label}</button>
@@ -443,7 +443,7 @@ export default function App() {
                     </div>
                     <div style={{
                       padding: "8px 14px",
-                      background: "rgba(10,132,255,0.12)",
+                      background: "rgba(0,122,255,0.12)",
                       borderRadius: 8,
                       fontSize: 13, color: C.blue, fontWeight: 600,
                       whiteSpace: "nowrap",
@@ -474,7 +474,7 @@ export default function App() {
                           borderRadius: 10,
                           border: `1px solid ${Math.abs(customKenpoRate - p.rate) < 0.01 ? C.blue : C.separator}`,
                           background: Math.abs(customKenpoRate - p.rate) < 0.01
-                            ? "rgba(10,132,255,0.12)"
+                            ? "rgba(0,122,255,0.12)"
                             : C.surface2,
                           color: C.labelPrimary,
                           cursor: "pointer", fontFamily: "inherit",
@@ -572,7 +572,7 @@ export default function App() {
                   <div style={{
                     marginTop: 10,
                     padding: "8px 14px",
-                    background: "rgba(10,132,255,0.08)",
+                    background: "rgba(0,122,255,0.08)",
                     borderRadius: 8,
                     fontSize: 12, color: C.blue,
                   }}>
@@ -648,7 +648,7 @@ export default function App() {
                   <div style={{
                     marginTop: 8, padding: "8px 12px",
                     borderRadius: 8,
-                    background: isCurrentFiscal ? "rgba(10,132,255,0.08)" : "rgba(255,159,10,0.08)",
+                    background: isCurrentFiscal ? "rgba(0,122,255,0.08)" : "rgba(255,149,0,0.08)",
                     fontSize: 11,
                     color: isCurrentFiscal ? C.blue : C.orange,
                   }}>
@@ -708,7 +708,7 @@ export default function App() {
         background: C.formBg,
         borderRadius: 16,
         padding: isMobile ? "20px 16px" : "28px 32px",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
       }}>
         <div style={{
           fontSize: 13, fontWeight: 600,
@@ -773,7 +773,7 @@ export default function App() {
             )}
             <div style={{
               marginTop: 8, padding: "9px 11px",
-              background: "rgba(10,132,255,0.08)",
+              background: "rgba(0,122,255,0.08)",
               borderRadius: 8,
             }}>
               <div style={{ fontSize: 10, color: C.blue, fontWeight: 600, marginBottom: 3 }}>
@@ -1105,7 +1105,7 @@ export default function App() {
                       ])}
                       style={{
                         padding: "6px 14px", borderRadius: 8,
-                        border: `1px solid ${C.blue}`, background: "rgba(10,132,255,0.12)",
+                        border: `1px solid ${C.blue}`, background: "rgba(0,122,255,0.12)",
                         color: C.blue, fontSize: 12, fontWeight: 600,
                         cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
                       }}
@@ -1123,7 +1123,7 @@ export default function App() {
                     return (
                       <div style={{
                         padding: "12px 16px", borderRadius: 12,
-                        background: "rgba(10,132,255,0.08)",
+                        background: "rgba(0,122,255,0.08)",
                         border: `1px solid ${C.blue}44`,
                         display: "flex", flexWrap: "wrap", gap: 10,
                         alignItems: "center", justifyContent: "space-between",
