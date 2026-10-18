@@ -7,6 +7,7 @@ import { C } from "./theme.js";
 import { Badge, NumInput, SegBtn } from "./components/primitives.jsx";
 import { CostSummaryTable } from "./components/CostSummaryTable.jsx";
 import { PatternCard } from "./components/PatternCard.jsx";
+import { IntroPanel } from "./components/IntroPanel.jsx";
 
 // recharts（グラフ描画）はシミュレーション結果を表示するまで不要なため、初回ロードを軽くするために動的import化
 const CompareChart = lazy(() =>
@@ -282,7 +283,7 @@ export default function App() {
           background: "rgba(118,118,128,0.24)",
           gap: 2,
         }}>
-          {[["candidate", "候補者モード"], ["hr", "HR 設定モード"]].map(([m, label]) => (
+          {[["intro", "はじめに"], ["candidate", "候補者モード"], ["hr", "HR 設定モード"]].map(([m, label]) => (
             <button key={m} onClick={() => setMode(m)} style={{
               padding: isMobile ? "8px 16px" : "7px 20px",
               border: "none", borderRadius: 8, cursor: "pointer",
@@ -297,6 +298,9 @@ export default function App() {
           ))}
         </div>
       </div>
+
+      {/* はじめに */}
+      {mode === "intro" && <IntroPanel setMode={setMode} isMobile={isMobile} />}
 
       {/* HR 設定パネル */}
       {mode === "hr" && (
@@ -687,6 +691,7 @@ export default function App() {
         </div>
       )}
 
+      {mode !== "intro" && (<>
       {/* 入力フォーム */}
       <div style={{
         maxWidth: 680, margin: "0 auto 20px",
@@ -1242,9 +1247,11 @@ export default function App() {
           )}
         </div>
       )}
+      </>)}
 
 
       {/* 利用マニュアル */}
+      {mode !== "intro" && (
       <div style={{ maxWidth: 680, margin: "48px auto 0" }}>
         <div style={{
           borderTop: `1px solid ${C.separator}`,
@@ -1404,6 +1411,7 @@ export default function App() {
           })}
         </div>
       </div>
+      )}
 
       {/* FAQ */}
       <div style={{ maxWidth: 680, margin: "24px auto 0" }}>
