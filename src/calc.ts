@@ -89,6 +89,8 @@ export interface CalcPatternResult {
   co_shakai: number;
   co_yachin: number;
   companyTotal: number;
+  shatakOver: boolean;      // 実賃料が補助対象限度額を超えた（超過ケース）
+  shatakLimit: number | null; // 適用した補助対象限度額（未指定ならnull）
 }
 
 export const calcPattern = (
@@ -100,9 +102,14 @@ export const calcPattern = (
   kenpoRate: number,
   bonusMonths: number,
   coRatio: number,
+  // 借上社宅管理規程 第11条の補助対象限度額（円）。指定すると、家賃が限度額を超えた分は全額本人負担になる。
+  // 省略（null）時は従来どおり家賃全額×会社負担割合で計算する（上限なし）。
+  limit: number | null = null,
 ): CalcPatternResult => {
   const coR = coRatio / 100;
-  const teiji = withShatak ? nenshu - yachin * coR * 12 : nenshu;
+  const split = withShatak ? splitShatak(yachin, limit, coR) : null;
+  const companyYachin = split ? split.company : 0;
+  const teiji = nenshu - companyYachin * 12;
   const monthly = teiji / (12 + bonusMonths);
   const annualBonus = monthly * bonusMonths;
   const h = getHyojun(monthly);           // 厚生年金用（上限65万円）
@@ -124,7 +131,7 @@ export const calcPattern = (
   const kazei = Math.max(0, shotokuGaku - annual_shakai - kisoKojoShotoku(shotokuGaku) - 380000 * dep);
   const annual_shotoku = calcShotoku(kazei);
   const annual_jumin   = calcJumin(teiji, annual_shakai, dep);
-  const selfYachin    = withShatak ? Math.round(yachin * (1 - coR)) : yachin;
+  const selfYachin    = split ? split.personal : yachin;
   const annual_yachin = selfYachin * 12;
   const annual_tedori = teiji - annual_shakai - annual_shotoku - annual_jumin - annual_yachin;
   const m_shakai  = Math.round(annual_shakai / 12);
@@ -133,7 +140,7 @@ export const calcPattern = (
   const m_tedori  = Math.round(annual_tedori / 12);
   const co_shakai = Math.round(hKenpo * kenpoRate) + (age >= 40 ? Math.round(hKenpo * 0.0081) : 0)
     + Math.round(h * 0.0915) + Math.round(monthly * 0.0085);
-  const co_yachin = withShatak ? Math.round(yachin * coR) : 0;
+  const co_yachin = companyYachin;
   return {
     teiji, monthly, annualBonus, h,
     kenpo, kaigo, kosei, koyo, monthly_shakai,
@@ -143,6 +150,8 @@ export const calcPattern = (
     selfYachin, annual_yachin,
     co_shakai, co_yachin,
     companyTotal: monthly + co_shakai + co_yachin,
+    shatakOver: split ? split.isOver : false,
+    shatakLimit: withShatak ? limit : null,
   };
 };
 
@@ -166,4 +175,55 @@ export const calcLimits = (kihonkyu: number, taido: Taido): KiteiLimits => {
   const genzai = Math.floor(kihonkyu * TAIDO_RATIO[taido]); // 補助対象限度額
   const warnThreshold = Math.floor(genzai * 1.5);           // 提供可否の目安ライン
   return { genzai, warnThreshold };
+};
+
+// ─────────────────────────────────────────────────────────────
+// 借上社宅管理規程 第11条: 会社負担・本人負担の按分
+// ・実賃料 ≤ 限度額: 会社負担 = 実賃料 × 会社負担割合、本人負担 = 残り
+// ・実賃料 > 限度額: 会社負担 = 限度額 × 会社負担割合、本人負担 = (限度額 − 会社負担) + 超過分
+// 端数処理: 円未満切り捨て（暫定ルール）。limit が null の場合は上限なし。
+// 規定通りツール（KiteiApp）と概算ツール（App / calcPattern）で同じ関数を使う。
+// ─────────────────────────────────────────────────────────────
+export interface ShatakSplit {
+  company: number;
+  personal: number;
+  isOver: boolean;
+}
+export const splitShatak = (chinryo: number, limit: number | null, coR: number): ShatakSplit => {
+  const isOver = limit !== null && chinryo > limit;
+  const base = isOver ? (limit as number) : chinryo;
+  const company = Math.floor(base * coR);
+  return { company, personal: chinryo - company, isOver };
+};
+
+// 規程上の会社負担割合（第11条の確定値）。候補者向けの共有URLもこの値で固定する。
+export const KITEI_COMPANY_RATIO = 0.7;
+
+// ─────────────────────────────────────────────────────────────
+// 賃貸料相当額（所得税基本通達36-41・36-45: 使用人に貸与する社宅は床面積にかかわらずこの算式）
+// 月額 = 建物の固定資産税課税標準額 × 0.2% ＋ 12円 × (床面積㎡ ÷ 3.3㎡) ＋ 敷地の固定資産税課税標準額 × 0.22%
+// 借上社宅管理規程 第11条ただし書き: 本人負担がこれを下回る場合は、本人負担を賃貸料相当額まで引き上げる
+// ─────────────────────────────────────────────────────────────
+export const calcChintairyoSoutou = (
+  tatemonoKazei: number, shikichiKazei: number, yukaMenseki: number,
+): number => Math.floor(tatemonoKazei * 0.002 + 12 * (yukaMenseki / 3.3) + shikichiKazei * 0.0022);
+
+// ─────────────────────────────────────────────────────────────
+// 「社宅あり（給与減額後）の基本給」を上限の基準にする場合の計算
+// 減額後の基本給 = 社宅なしの基本給 − 会社負担 × 12 ÷ (12 + 賞与月数)
+// 会社負担は減額後の基本給で決まる上限に左右され、上限は会社負担で決まる…という循環になるため、
+// 値が動かなくなるまで繰り返し計算する（不動点反復）。1回あたりの変化は最大でも約2割に縮むので数回で収束する。
+// ─────────────────────────────────────────────────────────────
+export const solveKihonkyuAfterShatak = (
+  kihonkyuBase: number, taido: Taido, chinryo: number, bonusMonths: number, coR: number,
+): number => {
+  let k = kihonkyuBase;
+  for (let i = 0; i < 100; i++) {
+    const { genzai } = calcLimits(k, taido);
+    const { company } = splitShatak(chinryo, genzai, coR);
+    const next = Math.floor(kihonkyuBase - (company * 12) / (12 + bonusMonths));
+    if (next === k) break;
+    k = next;
+  }
+  return k;
 };

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, Suspense, lazy } from "react";
 import { RATE_YEAR, KENPO_RATES, PREFS, KUMIAI_PRESETS } from "./rates";
-import { calcPattern, calcLimits } from "./calc";
+import { calcPattern, calcLimits, solveKihonkyuAfterShatak, KITEI_COMPANY_RATIO } from "./calc";
 import { yen, yen2 } from "./format";
 import { clampOrNull } from "./utils";
 import { C } from "./theme.js";
@@ -35,6 +35,13 @@ export default function App() {
   const [isMobile,      setIsMobile]      = useState(window.innerWidth < 640);
   const [extraScenarios, setExtraScenarios] = useState([]); // [{id,label,yachin,coRatio}]
   const [joinYM,        setJoinYM]        = useState(""); // "YYYY-MM" 入社想定年月
+  // 借上社宅管理規程 第9条: 上限の基準
+  const [taido,         setTaido]         = useState("tanshin");  // "tanshin" | "kazoku"（扶養人数とは別に選ぶ）
+  const [kihonkyuMode,  setKihonkyuMode]  = useState("nenshu");   // "nenshu"（年収から算出）| "direct"（直接入力）
+  const [kihonkyuDirect, setKihonkyuDirect] = useState(600000);   // 基本給（月額・円）直接入力
+  const [limitBasis,    setLimitBasis]    = useState("before");   // "before"（社宅なしの基本給）| "after"（社宅あり・減額後）
+  // 共有URLの会社負担割合を規程値（70%）で固定する（候補者に誤った割合で送るのを防ぐ）
+  const [lockShareRatio, setLockShareRatio] = useState(true);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 640);
@@ -58,8 +65,18 @@ export default function App() {
       if (p.get("p") && KENPO_RATES[p.get("p")]) setPref(p.get("p"));
       const b = clampOrNull(p.get("b"), 0, 12);
       if (b !== null) setBonus(b);
+      // r が無いURL（規程値固定で発行したURL）は既定の70%のまま
       const r = clampOrNull(p.get("r"), 50, 100);
       if (r !== null) setCoRatio(r);
+      // 帯同区分: 旧URL（t なし）は扶養人数から判定していた従来の挙動にあわせる
+      const t = p.get("t");
+      if (t === "tanshin" || t === "kazoku") setTaido(t);
+      else if (d !== null) setTaido(d > 0 ? "kazoku" : "tanshin");
+      if (p.get("km") === "direct") {
+        const k = clampOrNull(p.get("k"), 10000, 5000000);
+        if (k !== null) { setKihonkyuMode("direct"); setKihonkyuDirect(k); }
+      }
+      if (p.get("lb") === "after") setLimitBasis("after");
       if (p.get("it") === "kumiai") {
         setInsuranceType("kumiai");
         const kr = clampOrNull(p.get("kr"), 1, 15);
@@ -78,29 +95,42 @@ export default function App() {
     return (KENPO_RATES[pref] ?? 5.005) / 100;
   }, [insuranceType, customKenpoRate, pref]);
 
+  // ── 借上社宅管理規程 第9条・第11条: 補助対象限度額（上限）の算出 ──
+  // 基本給は「理論年収 ÷ (12 + 賞与月数)」で算出するか、直接入力（手当がある人向け）。
+  // 「社宅あり（減額後）」を選ぶと、会社負担の分だけ給与を減らした後の基本給で上限を判定する。
+  const kihonkyuBase = kihonkyuMode === "direct"
+    ? kihonkyuDirect
+    : Math.floor((nenshu * 10000) / (12 + bonus));
+  const limitFor = useCallback((yachinYen, ratioPct) => {
+    const kihonkyu = limitBasis === "after"
+      ? solveKihonkyuAfterShatak(kihonkyuBase, taido, yachinYen, bonus, ratioPct / 100)
+      : kihonkyuBase;
+    return { kihonkyu, ...calcLimits(kihonkyu, taido) };
+  }, [limitBasis, kihonkyuBase, taido, bonus]);
+  const rentLimit = useMemo(() => limitFor(yachin * 10000, coRatio), [limitFor, yachin, coRatio]);
+  const yachinYen = yachin * 10000;
+  const rentIsOver = yachinYen > rentLimit.genzai;
+  const rentNeedsConsult = yachinYen > rentLimit.warnThreshold;
+
   const result = useMemo(() => {
     if (!ran) return null;
     const n = nenshu * 10000, y = yachin * 10000;
     return {
-      no:  calcPattern(n, y, age, dep, false, kenpoRate, bonus, coRatio),
-      yes: calcPattern(n, y, age, dep, true,  kenpoRate, bonus, coRatio),
+      no:  calcPattern(n, y, age, dep, false, kenpoRate, bonus, coRatio, rentLimit.genzai),
+      yes: calcPattern(n, y, age, dep, true,  kenpoRate, bonus, coRatio, rentLimit.genzai),
     };
-  }, [ran, nenshu, yachin, age, dep, kenpoRate, bonus, coRatio]);
+  }, [ran, nenshu, yachin, age, dep, kenpoRate, bonus, coRatio, rentLimit.genzai]);
 
   const diff = result ? result.yes.annual_tedori - result.no.annual_tedori : 0;
-
-  // 借上社宅管理規程ベースの家賃目安（物件が未確定の段階でも提示年収だけで概算できる）。
-  // 扶養家族の人数から帯同区分を簡易判定（0人なら単身、1人以上なら家族帯同とみなす）。
-  // 正式な判定・金額は物件確定後に規定通りツール（/kitei）で確認する。
-  const taido = dep > 0 ? "kazoku" : "tanshin";
-  const kihonkyuNoShatak = Math.floor((nenshu * 10000) / (12 + bonus));
-  const rentLimit = useMemo(
-    () => calcLimits(kihonkyuNoShatak, taido),
-    [kihonkyuNoShatak, taido],
-  );
+  const taidoLabel = taido === "kazoku" ? "家族帯同（配偶者・扶養家族と同居）" : "単身";
+  const kihonkyuLabel = `${kihonkyuMode === "direct" ? "直接入力" : "理論年収から算出"}・${limitBasis === "after" ? "社宅あり（減額後）" : "社宅なし"}`;
 
   const buildShareURL = useCallback(() => {
-    const base = { n: nenshu, y: yachin, a: age, d: dep, p: pref, b: bonus, r: coRatio };
+    const base = { n: nenshu, y: yachin, a: age, d: dep, p: pref, b: bonus, t: taido };
+    // 規程値固定（既定）のときは r を付けない → 候補者側は常に70%で表示される
+    if (!lockShareRatio) base.r = coRatio;
+    if (kihonkyuMode === "direct") { base.km = "direct"; base.k = kihonkyuDirect; }
+    if (limitBasis === "after") base.lb = "after";
     if (insuranceType === "kumiai") {
       base.it = "kumiai";
       base.kr = customKenpoRate;
@@ -108,7 +138,7 @@ export default function App() {
     if (joinYM) base.jm = joinYM;
     const params = new URLSearchParams(base);
     return `${window.location.href.split("#")[0]}#${params.toString()}`;
-  }, [nenshu, yachin, age, dep, pref, bonus, coRatio, insuranceType, customKenpoRate, joinYM]);
+  }, [nenshu, yachin, age, dep, pref, bonus, coRatio, insuranceType, customKenpoRate, joinYM, taido, kihonkyuMode, kihonkyuDirect, limitBasis, lockShareRatio]);
 
   const handleCopyURL = useCallback(async () => {
     try {
@@ -132,8 +162,13 @@ export default function App() {
       "",
       "【入力条件】",
       `  理論年収（提示年収）: ${yen2(nenshuYen)}`,
-      `  想定家賃（月額）    : ${yen(yachin * 10000)}`,
+      `  実賃料（月額）      : ${yen(yachin * 10000)}（家賃＋共益費＋管理費）`,
       `  社宅会社負担割合    : ${coRatio}%（本人負担 ${100 - coRatio}%）`,
+      `  帯同区分            : ${taidoLabel}`,
+      `  上限の基準の基本給  : ${yen(rentLimit.kihonkyu)}（${kihonkyuLabel}）`,
+      `  補助対象限度額      : ${yen(rentLimit.genzai)}（要相談ライン ${yen(rentLimit.warnThreshold)}）`,
+      ...(yes.shatakOver ? [`  ※ 超過ケース：会社負担は上限までです（超過分 ${yen(yachin * 10000 - rentLimit.genzai)} は本人負担）`] : []),
+      ...(rentNeedsConsult ? ["  ⚠ 実賃料が要相談ライン（上限の1.5倍）を超えています"] : []),
       insuranceType === "kumiai"
         ? `  健康保険            : 健康保険組合・共済組合（被保険者折半率 ${customKenpoRate}%）`
         : `  都道府県            : ${pref}（協会けんぽ ${KENPO_RATES[pref]}%）`,
@@ -177,7 +212,7 @@ export default function App() {
       `    企業合計          : ${yen2(yes.companyTotal * 12)}`,
       "",
       "  個人負担（年間）",
-      `    家賃（${100 - coRatio}%）       : ${yen2(yes.annual_yachin)}`,
+      `    家賃（本人負担）  : ${yen2(yes.annual_yachin)}`,
       `    社保（本人）      : ${yen2(yes.annual_shakai)}`,
       `    税金              : ${yen2(yes.annual_shotoku + yes.annual_jumin)}`,
       `    個人負担合計      : ${yen2(yesPersonal)}`,
@@ -199,7 +234,7 @@ export default function App() {
       await navigator.clipboard.writeText(text);
       setCopied("text"); setTimeout(() => setCopied(""), 2500);
     } catch { alert("コピーに失敗しました。"); }
-  }, [result, diff, pref, bonus, age, dep, nenshu, yachin, coRatio, joinYM, insuranceType, customKenpoRate]);
+  }, [result, diff, pref, bonus, age, dep, nenshu, yachin, coRatio, joinYM, insuranceType, customKenpoRate, taidoLabel, kihonkyuLabel, rentLimit, rentNeedsConsult]);
 
   const handlePrint = () => window.print();
   const resetRan = () => setRan(false);
@@ -219,8 +254,12 @@ export default function App() {
       [],
       ["入力条件"],
       ["理論年収（万円）", nenshu],
-      ["想定家賃・月額（万円）", yachin],
+      ["実賃料・月額（万円）", yachin],
       ["社宅会社負担割合（%）", coRatio],
+      ["帯同区分", taidoLabel],
+      ["上限の基準の基本給（円）", `${rentLimit.kihonkyu}（${kihonkyuLabel}）`],
+      ["補助対象限度額（円）", rentLimit.genzai],
+      ["適用ケース", yes.shatakOver ? "超過ケース" : "通常ケース"],
       insuranceType === "kumiai"
         ? ["健康保険", `健保組合・共済 ${customKenpoRate}%`]
         : ["健康保険", `協会けんぽ ${pref}（${KENPO_RATES[pref]}%）`],
@@ -237,9 +276,10 @@ export default function App() {
     a.download = "shatak-simulation.csv";
     a.click();
     URL.revokeObjectURL(url);
-  }, [result, nenshu, yachin, age, dep, bonus, coRatio, pref, insuranceType, customKenpoRate]);
+  }, [result, nenshu, yachin, age, dep, bonus, coRatio, pref, insuranceType, customKenpoRate, taidoLabel, kihonkyuLabel, rentLimit]);
 
   // フォーム用スタイル
+  const segWrap = { display: "flex", gap: 4, background: "rgba(118,118,128,0.18)", borderRadius: 10, padding: 3 };
   const lbl = {
     fontSize: 11, fontWeight: 600,
     color: C.gray,
@@ -606,6 +646,15 @@ export default function App() {
                 会社負担 <span style={{ color: C.labelPrimary, fontWeight: 600 }}>{coRatio}%</span>
                 　/　本人負担 <span style={{ color: C.labelPrimary, fontWeight: 600 }}>{100 - coRatio}%</span>
               </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 12, color: C.labelPrimary, cursor: "pointer" }}>
+                <input type="checkbox" checked={lockShareRatio} onChange={e => setLockShareRatio(e.target.checked)} />
+                候補者への共有URLは規程値（会社負担{Math.round(KITEI_COMPANY_RATIO * 100)}%）で固定する（推奨）
+              </label>
+              {lockShareRatio && coRatio !== Math.round(KITEI_COMPANY_RATIO * 100) && (
+                <div style={{ marginTop: 6, fontSize: 11, color: C.orange }}>
+                  画面は{coRatio}%で試算中ですが、共有URLは{Math.round(KITEI_COMPANY_RATIO * 100)}%で発行されます。
+                </div>
+              )}
             </div>
 
             {/* 入社想定日 */}
@@ -771,27 +820,13 @@ export default function App() {
                 月給 約{Math.round(nenshu / (12 + bonus))}万　+　賞与 約{Math.round(nenshu * bonus / (12 + bonus))}万/年
               </div>
             )}
-            <div style={{
-              marginTop: 8, padding: "9px 11px",
-              background: "rgba(0,122,255,0.08)",
-              borderRadius: 8,
-            }}>
-              <div style={{ fontSize: 10, color: C.blue, fontWeight: 600, marginBottom: 3 }}>
-                会社制度で支払える家賃の目安（規程基準・{taido === "kazoku" ? "家族帯同" : "単身"}）
-              </div>
-              <div style={{ fontSize: 12, color: C.formSecond }}>
-                上限　<strong style={{ color: C.formLabel }}>{yen(rentLimit.genzai)}</strong>　／　要相談ライン　<strong style={{ color: C.formLabel }}>{yen(rentLimit.warnThreshold)}</strong>
-              </div>
-              <div style={{ fontSize: 10, color: C.gray, marginTop: 3 }}>
-                扶養家族の人数から簡易判定した概算です。正式な金額は物件確定後に規定通りツールで確認してください。
-              </div>
-            </div>
           </div>
 
-          {/* 家賃 */}
+          {/* 実賃料（第4条: 家賃＋共益費＋管理費） */}
           <div>
-            <label style={lbl} htmlFor="input-yachin">想定家賃・月額（万円）</label>
-            <NumInput id="input-yachin" label="想定家賃" val={yachin} setter={setYachin} min={1} max={100} step={0.5} onDone={resetRan} isMobile={isMobile} />
+            <label style={lbl} htmlFor="input-yachin">実賃料（家賃＋共益費＋管理費）・月額（万円）</label>
+            <NumInput id="input-yachin" label="実賃料" val={yachin} setter={setYachin} min={1} max={100} step={0.5} onDone={resetRan} isMobile={isMobile} />
+            <RentCaseNote isOver={rentIsOver} needsConsult={rentNeedsConsult} limit={rentLimit} />
           </div>
 
           {/* 年齢 */}
@@ -821,6 +856,69 @@ export default function App() {
                 </SegBtn>
               ))}
             </div>
+            <div style={{ marginTop: 6, fontSize: 11, color: C.gray }}>
+              税金（扶養控除）の計算に使います。上限の判定は下の「帯同区分」で行います。
+            </div>
+          </div>
+
+          {/* 上限の基準（第9条） */}
+          <div style={{ gridColumn: isMobile ? "auto" : "1 / -1" }}>
+            <label style={lbl} id="label-limit">社宅の上限（借上社宅管理規程 第9条）</label>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 12 : "12px 28px" }}>
+              <div>
+                <div style={{ fontSize: 11, color: C.formSecond, marginBottom: 6 }}>帯同区分</div>
+                <div role="group" aria-label="帯同区分" style={segWrap}>
+                  {[["tanshin", "単身"], ["kazoku", "家族帯同"]].map(([v, label]) => (
+                    <SegBtn key={v} active={taido === v} onClick={() => { setTaido(v); resetRan(); }} isMobile={isMobile}>{label}</SegBtn>
+                  ))}
+                </div>
+                <div style={{ marginTop: 6, fontSize: 11, color: C.gray }}>
+                  配偶者・扶養家族と同居する場合は家族帯同（基本給×1/4）、それ以外は単身（基本給×1/5）
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: C.formSecond, marginBottom: 6 }}>基本給の求め方</div>
+                <div role="group" aria-label="基本給の求め方" style={segWrap}>
+                  {[["nenshu", "年収から算出"], ["direct", "直接入力"]].map(([v, label]) => (
+                    <SegBtn key={v} active={kihonkyuMode === v} onClick={() => { setKihonkyuMode(v); resetRan(); }} isMobile={isMobile}>{label}</SegBtn>
+                  ))}
+                </div>
+                {kihonkyuMode === "direct" ? (
+                  <div style={{ marginTop: 8 }}>
+                    <NumInput id="input-kihonkyu" label="基本給（社宅なし・月額・円）" val={kihonkyuDirect} setter={setKihonkyuDirect} min={10000} max={5000000} step={1000} onDone={resetRan} isMobile={isMobile} />
+                    <div style={{ marginTop: 6, fontSize: 11, color: C.gray }}>社宅なしの基本給（月額・円）。手当は含めません。</div>
+                  </div>
+                ) : (
+                  <div style={{ marginTop: 6, fontSize: 11, color: C.gray }}>
+                    理論年収 ÷ (12 + 賞与月数) = {yen(kihonkyuBase)}（手当がある人は「直接入力」を使ってください）
+                  </div>
+                )}
+              </div>
+              <div style={{ gridColumn: isMobile ? "auto" : "1 / -1" }}>
+                <div style={{ fontSize: 11, color: C.formSecond, marginBottom: 6 }}>上限の判定に使う基本給</div>
+                <div role="group" aria-label="上限の判定に使う基本給" style={segWrap}>
+                  {[["before", "社宅なしの基本給"], ["after", "社宅あり（給与減額後）"]].map(([v, label]) => (
+                    <SegBtn key={v} active={limitBasis === v} onClick={() => { setLimitBasis(v); resetRan(); }} isMobile={isMobile}>{label}</SegBtn>
+                  ))}
+                </div>
+                {limitBasis === "after" && (
+                  <div style={{ marginTop: 6, fontSize: 11, color: C.gray }}>
+                    会社負担の分だけ給与を減らした後の基本給で上限を判定します（減額後 {yen(rentLimit.kihonkyu)}）。
+                  </div>
+                )}
+              </div>
+            </div>
+            <div style={{ marginTop: 10, padding: "9px 11px", background: "rgba(0,122,255,0.08)", borderRadius: 8 }}>
+              <div style={{ fontSize: 10, color: C.blue, fontWeight: 600, marginBottom: 3 }}>
+                会社制度で支払える家賃の目安（規程基準・{taido === "kazoku" ? "家族帯同" : "単身"}・基本給 {yen(rentLimit.kihonkyu)}）
+              </div>
+              <div style={{ fontSize: 12, color: C.formSecond }}>
+                上限　<strong style={{ color: C.formLabel }}>{yen(rentLimit.genzai)}</strong>　／　要相談ライン　<strong style={{ color: C.formLabel }}>{yen(rentLimit.warnThreshold)}</strong>
+              </div>
+              <div style={{ fontSize: 10, color: C.gray, marginTop: 3 }}>
+                正式な金額（賃貸料相当額による本人負担の下限を含む）は、物件確定後に規定通りツールで確認してください。
+              </div>
+            </div>
           </div>
         </div>
 
@@ -838,7 +936,7 @@ export default function App() {
                 ? `健保組合・共済 ${customKenpoRate}%（カスタム）`
                 : `協会けんぽ ${pref}（${KENPO_RATES[pref]}%）`
             ],
-            ["社宅負担", `会社${coRatio}% / 本人${100 - coRatio}%`],
+            ["社宅負担", `会社${coRatio}% / 本人${100 - coRatio}%（上限 ${yen(rentLimit.genzai)}）`],
             ["厚生年金", "18.30%（折半）"],
             ["雇用保険", "0.50%（本人）"],
             ["介護保険", "1.62%（折半・40歳以上）"],
@@ -869,6 +967,27 @@ export default function App() {
       {/* 結果エリア */}
       {result && (
         <div style={{ maxWidth: 680, margin: "0 auto" }}>
+
+          {/* 上限適用の表示（第11条） */}
+          {result.yes.shatakOver && (
+            <div style={{
+              borderRadius: 12, padding: "12px 16px", marginBottom: 12,
+              background: rentNeedsConsult ? "rgba(255,59,48,0.1)" : "rgba(255,149,0,0.12)",
+              border: `1px solid ${rentNeedsConsult ? C.red : C.orange}`,
+              color: rentNeedsConsult ? C.red : C.orange, fontSize: 13, fontWeight: 600, lineHeight: 1.6,
+            }}>
+              超過ケース：会社負担は上限までです。
+              <div style={{ fontWeight: 400, fontSize: 12 }}>
+                上限 {yen(rentLimit.genzai)} の{coRatio}%（{yen(result.yes.co_yachin)}）が会社負担、
+                上限を超えた {yen(yachin * 10000 - rentLimit.genzai)} は全額本人負担です。
+              </div>
+              {rentNeedsConsult && (
+                <div style={{ marginTop: 4 }}>
+                  ⚠ 実賃料が要相談ライン（上限の1.5倍・{yen(rentLimit.warnThreshold)}）を超えています。規程上、会社が提供を断ることができる物件です。
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 差額バナー */}
           <div style={{
@@ -954,6 +1073,11 @@ export default function App() {
               coRatio={coRatio}
               isMobile={isMobile}
             />
+          </div>
+
+          <div style={{ fontSize: 11, color: C.gray, lineHeight: 1.6, margin: "-4px 4px 14px" }}>
+            ※ 物件確定後、本人負担が賃貸料相当額（固定資産税の課税標準額・床面積から算出）を下回る場合は、規程により本人負担が引き上げられます。
+            また、社会保険の住宅の現物給与評価額（2026年10月以降は床面積1㎡あたりの単価）が本人負担を上回る場合は、差額が報酬月額に加算され社会保険料が増えることがあります。本シミュレーションはこれらを含まない概算です（規定通りツールで確認できます）。
           </div>
 
           {/* アクションボタン */}
@@ -1136,7 +1260,8 @@ export default function App() {
                           <span style={{ fontSize: 13, color: C.labelSecond }}>
                             家賃 <strong style={{ color: C.labelPrimary }}>{yachin}万円</strong>
                             　会社負担 <strong style={{ color: C.labelPrimary }}>{coRatio}%</strong>
-                            　本人負担 <strong style={{ color: C.labelPrimary }}>{Math.round(yachin * (1 - coRatio / 100) * 10) / 10}万/月</strong>
+                            　本人負担 <strong style={{ color: C.labelPrimary }}>{Math.round(mainResult.selfYachin / 1000) / 10}万/月</strong>
+                            {mainResult.shatakOver && <span style={{ color: C.orange, fontSize: 11 }}>　超過ケース</span>}
                           </span>
                         </div>
                         <span style={{ fontSize: 13, fontWeight: 700, color: C.blue, whiteSpace: "nowrap" }}>
@@ -1149,7 +1274,7 @@ export default function App() {
                   {/* 追加シナリオ */}
                   {extraScenarios.map((sc, idx) => {
                     const n = nenshu * 10000, y = sc.yachin * 10000;
-                    const scResult = calcPattern(n, y, age, dep, true, kenpoRate, bonus, sc.coRatio);
+                    const scResult = calcPattern(n, y, age, dep, true, kenpoRate, bonus, sc.coRatio, limitFor(y, sc.coRatio).genzai);
                     const scDiff = scResult.annual_tedori - result.no.annual_tedori;
                     return (
                       <div key={sc.id} style={{
@@ -1247,7 +1372,7 @@ export default function App() {
                           </div>
                           <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                             <div style={{ fontSize: 11, color: C.gray, marginBottom: 3 }}>
-                              本人負担 {Math.round(sc.yachin * (1 - sc.coRatio / 100) * 10) / 10}万/月
+                              本人負担 {Math.round(scResult.selfYachin / 1000) / 10}万/月{scResult.shatakOver ? "（超過ケース）" : ""}
                             </div>
                             <div style={{ fontSize: 15, fontWeight: 700, color: C.orange }}>
                               手取り {yen2(scResult.annual_tedori)}/年
@@ -1504,6 +1629,24 @@ export default function App() {
           button { display: none !important; }
         }
       `}</style>
+    </div>
+  );
+}
+
+// 実賃料入力欄の下に出す、上限適用の簡易表示
+function RentCaseNote({ isOver, needsConsult, limit }) {
+  if (!isOver) {
+    return (
+      <div style={{ marginTop: 6, fontSize: 11, color: C.green }}>
+        通常ケース（上限 {yen(limit.genzai)} 以内）
+      </div>
+    );
+  }
+  return (
+    <div style={{ marginTop: 6, fontSize: 11, fontWeight: 600, color: needsConsult ? C.red : C.orange }}>
+      {needsConsult
+        ? `⚠ 要相談ライン（${yen(limit.warnThreshold)}）超え：規程上、要相談の物件です`
+        : `超過ケース：会社負担は上限（${yen(limit.genzai)}）までです`}
     </div>
   );
 }
