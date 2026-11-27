@@ -37,7 +37,9 @@ export const PatternCard = ({ title, isRecommended, data, coRatio, isMobile }) =
         fontSize: 11,
       }}>
         月給 {yen2(data.monthly)}
-        {isRecommended ? `　家賃の${coRatio}%を会社負担` : "　家賃全額自己負担"}
+        {isRecommended
+          ? (data.shatakOver ? `　上限${yen(data.shatakLimit)}の${coRatio}%を会社負担（超過ケース）` : `　家賃の${coRatio}%を会社負担`)
+          : "　家賃全額自己負担"}
       </div>
     </div>
 
