@@ -56,4 +56,9 @@ describe("社宅あり（給与減額後）の基本給で上限を判定", () =
     expect(Math.abs(k - (base - company))).toBeLessThanOrEqual(1);
     expect(k).toBeLessThan(base);
   });
+
+  it("切り捨てで2つの値を行き来する場合も、小さい方の1つの値に決まる", () => {
+    // 833,333円・単身・実賃料20万円・賞与0は 730,994円 ⇄ 730,995円 を行き来するケース
+    expect(solveKihonkyuAfterShatak(833333, "tanshin", 200000, 0, 0.7)).toBe(730994);
+  });
 });

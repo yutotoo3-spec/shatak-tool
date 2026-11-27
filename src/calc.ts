@@ -217,12 +217,17 @@ export const calcChintairyoSoutou = (
 export const solveKihonkyuAfterShatak = (
   kihonkyuBase: number, taido: Taido, chinryo: number, bonusMonths: number, coR: number,
 ): number => {
+  // 円未満切り捨ての影響で、最後に2つの値（例: 730,994円と730,995円）を交互に行き来して止まらないことがある。
+  // その場合は小さい方（上限が低くなる＝会社負担を多く見積もらない方）に決め、何度計算しても同じ答えにする。
   let k = kihonkyuBase;
+  let prev = Number.NaN;
   for (let i = 0; i < 100; i++) {
     const { genzai } = calcLimits(k, taido);
     const { company } = splitShatak(chinryo, genzai, coR);
     const next = Math.floor(kihonkyuBase - (company * 12) / (12 + bonusMonths));
     if (next === k) break;
+    if (next === prev) { k = Math.min(k, next); break; }
+    prev = k;
     k = next;
   }
   return k;
