@@ -26,7 +26,9 @@ const calcKitei = (kihonkyu, taido, chinryo, soutougaku = 0) => {
     company = chinryo - personal;
   }
   const needsConsultation = chinryo > warnThreshold;
-  return { genzai, isOver: split.isOver, company, personal, warnThreshold, needsConsultation, floorApplied };
+  // baseCompany/basePersonal: 賃貸料相当額で調整する前の按分（計算過程の表示用）
+  return { genzai, isOver: split.isOver, company, personal, warnThreshold, needsConsultation, floorApplied,
+    baseCompany: split.company, basePersonal: split.personal };
 };
 
 const yen = (v) => `${Math.round(v).toLocaleString()}円`;
@@ -459,19 +461,21 @@ export default function KiteiApp() {
                   value={`実賃料 ${yen(chinryo)} ${result.isOver ? ">" : "≤"} 限度額 ${yen(result.genzai)}`} muted />
                 {!result.isOver ? (
                   <>
-                    <Row label="④ 会社負担" value={`実賃料 × ${companyPct}% = ${yen(result.company)}`} muted />
-                    <Row label="④ 本人負担" value={`実賃料 − 会社負担 = ${yen(result.personal)}`} muted />
+                    <Row label="④ 会社負担" value={`実賃料 × ${companyPct}% = ${yen(result.baseCompany)}`} muted />
+                    <Row label="④ 本人負担" value={`実賃料 − 会社負担 = ${yen(result.basePersonal)}`} muted />
                   </>
                 ) : (
                   <>
-                    <Row label="④ 会社負担" value={`限度額 × ${companyPct}% = ${yen(result.company)}`} muted />
+                    <Row label="④ 会社負担" value={`限度額 × ${companyPct}% = ${yen(result.baseCompany)}`} muted />
                     <Row label="④ 本人負担"
-                      value={`(限度額 − 会社負担) + (実賃料 − 限度額) = ${yen(result.personal)}`} muted />
+                      value={`(限度額 − 会社負担) + (実賃料 − 限度額) = ${yen(result.basePersonal)}`} muted />
                   </>
                 )}
                 {soutougaku > 0 && (
                   <Row label="④' 賃貸料相当額の下限"
-                    value={`${yen(soutougaku)}（${result.floorApplied ? "本人負担を引き上げ・会社負担 = 実賃料 − 本人負担" : "本人負担が上回るため調整なし"}）`} muted />
+                    value={result.floorApplied
+                      ? `${yen(soutougaku)} > 本人負担 ${yen(result.basePersonal)} → 本人負担 ${yen(result.personal)}・会社負担 ${yen(result.company)}`
+                      : `${yen(soutougaku)}（本人負担が上回るため調整なし）`} muted />
                 )}
                 {genbutsu && (
                   <Row label="④'' 社保の現物給与"

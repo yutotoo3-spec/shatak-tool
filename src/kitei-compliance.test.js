@@ -42,6 +42,8 @@ describe("賃貸料相当額（第11条ただし書き）", () => {
     expect(r.floorApplied).toBe(true);
     expect(r.personal).toBe(20000);
     expect(r.company).toBe(30000);
+    expect(r.baseCompany).toBe(35000); // 調整前（計算過程の表示用）
+    expect(r.basePersonal).toBe(15000);
     const r2 = calcKitei(709220, "tanshin", 50000, 10000);
     expect(r2.floorApplied).toBe(false);
     expect(r2.personal).toBe(15000);
